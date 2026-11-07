@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>マイアプリ書き込み</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=BIZ+UDPGothic:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column like a phone settings screen; the ring of 12 LEDs is the only ornament */
+:root {
+  --bg: #f6f3f5;
+  --panel: #ffffff;
+  --ink: #241a22;
+  --sub: #6d5f69;
+  --line: #e4dbe1;
+  --pink: #e0367f;
+  --pink-soft: #fbe3ee;
+  --ok: #1f8a5b;
+  --warn: #b5482b;
+  --code-bg: #2a2128;
+  --code-fg: #f3e9ef;
+  --ws-bg: #fbf8fa;
+  --flyout: #efe7ec;
+  --f-display: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+  --f-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-code: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161115; --panel: #221a20; --ink: #f2e8ee; --sub: #b3a3ad; --line: #3a2f37;
+  --pink: #ff5aa0; --pink-soft: #3d1f2e; --ok: #4cc58d; --warn: #ff8a66;
+  --code-bg: #0f0b0e; --code-fg: #f3e9ef; --ws-bg: #1b1519; --flyout: #2b2229; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #161115; --panel: #221a20; --ink: #f2e8ee; --sub: #b3a3ad; --line: #3a2f37;
+  --pink: #ff5aa0; --pink-soft: #3d1f2e; --ok: #4cc58d; --warn: #ff8a66;
+  --code-bg: #0f0b0e; --code-fg: #f3e9ef; --ws-bg: #1b1519; --flyout: #2b2229; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.65; }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 20px; }
+header { display: flex; align-items: center; gap: 16px; }
+header canvas { width: 64px; height: 64px; flex: none; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: 1.5rem; line-height: 1.3; margin: 0; text-wrap: balance; }
+header p { margin: 2px 0 0; color: var(--sub); font-size: .9rem; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+h2 { font-family: var(--f-display); font-weight: 800; font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 10px; }
+h2 .n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--pink); color: var(--panel); font-size: .85rem; flex: none; }
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+.tab { font-family: var(--f-display); font-weight: 800; font-size: .95rem; padding: 8px; border: none; border-radius: 9px; background: transparent; color: var(--sub); cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+.pane { display: grid; gap: 12px; min-width: 0; }
+
+.samples { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; font-size: .9rem; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--pink-soft); border-color: var(--pink); font-weight: 700; }
+#blockly { height: min(68vh, 560px); min-height: 380px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.blockly-fail { display: grid; place-items: center; padding: 24px; text-align: center; color: var(--sub); }
+details { font-size: .9rem; }
+summary { cursor: pointer; color: var(--sub); }
+pre { margin: 8px 0 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--f-code); font-size: 12px; line-height: 1.55; padding: 12px; border-radius: 10px; overflow-x: auto; max-height: 320px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ghost { font: inherit; font-size: .88rem; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+textarea { width: 100%; box-sizing: border-box; min-height: 300px; resize: vertical; font-family: var(--f-code); font-size: 13px; line-height: 1.55;
+  background: var(--code-bg); color: var(--code-fg); border: none; border-radius: 10px; padding: 12px; tab-size: 4; }
+.meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; font-size: .82rem; color: var(--sub); font-variant-numeric: tabular-nums; }
+.meta .bad { color: var(--warn); font-weight: 700; }
+button.go { font-family: var(--f-display); font-weight: 800; font-size: 1.05rem; padding: 14px; border-radius: 12px; border: none; background: var(--pink); color: #fff; cursor: pointer; }
+button.go:disabled { opacity: .45; cursor: default; }
+button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+.status { font-size: .9rem; min-height: 1.4em; margin: 0; }
+.status.ok { color: var(--ok); } .status.err { color: var(--warn); }
+ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+kbd { font-family: var(--f-code); font-size: .85em; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
+.note { font-size: .82rem; color: var(--sub); margin: 0; }
+code { font-family: var(--f-code); font-size: .88em; }
+</style>
+
+<div class="wrap">
+  <header>
+    <canvas id="ring" width="128" height="128" aria-hidden="true"></canvas>
+    <div>
+      <h1>マイアプリ書き込み</h1>
+      <p>ルーレット基板の「マイアプリ」に、自分のプログラムを入れる</p>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>プログラムを作る</h2>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-block" aria-selected="true">ブロック</button>
+      <button class="tab" role="tab" id="tab-text" aria-selected="false">テキスト（Python）</button>
+    </div>
+
+    <div class="pane" id="pane-block">
+      <div class="samples" id="bsamples"></div>
+      <div id="blockly"></div>
+      <p class="note">左の分類からブロックを引き出して「はじめに」「ずっと くりかえす」の中にはめます。いらないブロックは左の分類の上へドラッグすると消えます。リングは0番が12時で、時計回りに11番まで。</p>
+      <details>
+        <summary>できたプログラム（Python）を見る</summary>
+        <pre id="gen"></pre>
+      </details>
+      <div class="row"><button class="ghost" id="to-text" type="button">このプログラムをテキストで続きを書く</button></div>
+    </div>
+
+    <div class="pane" id="pane-text" hidden>
+      <div class="samples" id="tsamples"></div>
+      <textarea id="src" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="プログラム"></textarea>
+      <div class="meta"><span>setup() は最初に1回、loop() はずっと繰り返し</span></div>
+    </div>
+    <div class="meta"><span id="size"></span><span id="modeinfo"></span></div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>書き込みファイルを保存</h2>
+    <button class="go" id="save">keychain_program.txt を保存</button>
+    <p class="status" id="status" role="status"></p>
+    <p class="note">中身は基板用の書き込みデータ（UF2形式）です。名前は .txt ですが、そのまま使えます。いま選んでいるタブ（ブロックかテキスト）のプログラムが入ります。</p>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>基板にコピー</h2>
+    <ol>
+      <li>基板の <kbd>B</kbd> ボタンを押しながら、iPhoneにUSB-Cでつなぐ</li>
+      <li>「ファイル」アプリを開くと <code>RPI-RP2</code> が出る</li>
+      <li>保存した <code>keychain_program.txt</code> を長押し →「コピー」→ <code>RPI-RP2</code> の中で長押し →「ペースト」</li>
+      <li>RPI-RP2 が消えて基板が動き出したら完了。<kbd>A</kbd> を何回か押して「マイアプリ」（水色）に切り替える</li>
+    </ol>
+    <p class="note">保存のときに保存先を選べる場合は、直接 RPI-RP2 を選んでもかまいません。プログラムにまちがいがあると、マイアプリで赤が3回点滅します。</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/blockly@10.4.3/blockly_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@10.4.3/blocks_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@10.4.3/python_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@10.4.3/msg/ja.js"></script>
+<script>
+// ---- 基板側（main.py の load_flash_program）と同じ形。make_program_uf2.py と同じバイト列になる
+const USER_ADDR = 0x10090000, USER_MAX = 0x10000 - 16, FAMILY = 0xE48BFF56, PAYLOAD = 256;
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function programBlob(src) {                 // "KCUP" + 版1 + 予備0 + 長さ + CRC32 + 本文、256の倍数まで0xFF
+  const len = 16 + src.length, total = Math.ceil(len / PAYLOAD) * PAYLOAD;
+  const blob = new Uint8Array(total).fill(0xFF), dv = new DataView(blob.buffer);
+  blob.set([0x4B, 0x43, 0x55, 0x50], 0);
+  dv.setUint16(4, 1, true); dv.setUint16(6, 0, true);
+  dv.setUint32(8, src.length, true); dv.setUint32(12, crc32(src), true);
+  blob.set(src, 16);
+  return blob;
+}
+function toUf2(blob, addr) {
+  const n = blob.length / PAYLOAD, out = new Uint8Array(n * 512), dv = new DataView(out.buffer);
+  for (let i = 0; i < n; i++) {
+    const o = i * 512;
+    [0x0A324655, 0x9E5D5157, 0x00002000, addr + i * PAYLOAD, PAYLOAD, i, n, FAMILY]
+      .forEach((v, k) => dv.setUint32(o + k * 4, v, true));
+    out.set(blob.subarray(i * PAYLOAD, (i + 1) * PAYLOAD), o + 32);
+    dv.setUint32(o + 508, 0x0AB16F30, true);
+  }
+  return out;
+}
+
+// ---- テキストのサンプル
+const SAMPLES = {
+  "虹がまわる": `from keychain import ring, sensor
+import time
+
+t = 0
+step = 4                     # ＋で時計回り、−で反時計回り
+last_flip = 0
+
+
+def setup():
+    global t, step
+    t = 0
+    step = 4
+
+
+def loop():
+    global t, step, last_flip
+    for i in range(12):
+        h = (i * 21 + t) % 256
+        if h < 85:
+            c = (255 - h * 3, h * 3, 0)
+        elif h < 170:
+            h -= 85
+            c = (0, 255 - h * 3, h * 3)
+        else:
+            h -= 170
+            c = (h * 3, 0, 255 - h * 3)
+        ring.set(i, c)
+    ring.show()
+    t = (t + step) % 256
+    now = time.ticks_ms()
+    if sensor.shaken() and time.ticks_diff(now, last_flip) > 600:   # 振ると逆回り
+        step = -step
+        last_flip = now
+    time.sleep_ms(30)
+`,
+  "ハートの鼓動": `from keychain import ring, sensor
+import math
+import time
+
+t0 = 0
+
+
+def setup():
+    global t0
+    t0 = time.ticks_ms()
+
+
+def loop():
+    x, y, z = sensor.acceleration()
+    period = 600 if abs(x) > 0.5 else 1000      # 横に傾けると速くなる
+    p = time.ticks_diff(time.ticks_ms(), t0) % period
+    k = max(math.exp(-(p / 70) ** 2), 0.7 * math.exp(-((p - 250) / 70) ** 2))
+    ring.fill((int(255 * k), int(30 * k), int(120 * k)))
+    ring.show()
+    time.sleep_ms(20)
+`,
+  "青の追いかけっこ": `from keychain import ring
+import time
+
+i = 0
+
+
+def setup():
+    global i
+    i = 0
+
+
+def loop():
+    global i
+    ring.fill((0, 0, 0))
+    ring.set(i, (0, 80, 255))          # 先頭
+    ring.set(i - 1, (0, 20, 80))       # しっぽ
+    ring.show()
+    i = (i + 1) % 12
+    time.sleep_ms(80)
+`,
+};
+
+const $ = id => document.getElementById(id);
+const enc = new TextEncoder();
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+let mode = store.get("kc_mode") === "text" ? "text" : "block";
+let tSample = "虹がまわる", bSample = null, ws = null, generated = "";
+
+function setStatus(text, cls) { $("status").textContent = text; $("status").className = "status " + (cls || ""); }
+
+// ================================================================ ブロック
+const C = { ring: "#d6407f", colour: "#a855c9", bar: "#e08a2c", wait: "#3f8fd2", sensor: "#22a39a", hat: "#5b6070" };
+const N = (v) => ({ shadow: { type: "math_number", fields: { NUM: v } } });
+const COL = (hex) => ({ shadow: { type: "kc_colour", fields: { C: hex } } });
+
+function defineBlocks() {
+  Blockly.FieldColour.COLOURS = ["#ff0000", "#ff6a00", "#ffd000", "#3cff00", "#00ffb4", "#00c8ff", "#0050ff", "#8a2bff",
+                                 "#ff3c96", "#ff9ec8", "#ffffff", "#000000"];
+  Blockly.FieldColour.TITLES = ["赤", "オレンジ", "黄", "緑", "エメラルド", "水色", "青", "紫", "ピンク", "うすピンク", "白", "消える（黒）"];
+  Blockly.FieldColour.COLUMNS = 4;
+
+  const num = (name) => ({ type: "input_value", name, check: "Number" });
+  Blockly.defineBlocksWithJsonArray([
+    { type: "kc_setup", message0: "はじめに（1回だけ） %1 %2", args0: [{ type: "input_dummy" }, { type: "input_statement", name: "DO" }],
+      colour: C.hat, tooltip: "マイアプリに切り替えたとき、最初に1回だけ動きます" },
+    { type: "kc_loop", message0: "ずっと くりかえす %1 %2", args0: [{ type: "input_dummy" }, { type: "input_statement", name: "DO" }],
+      colour: C.hat, tooltip: "マイアプリのあいだ、何度も何度もくりかえします" },
+
+    { type: "kc_ring_fill", message0: "リング全部を %1 にする", args0: [{ type: "input_value", name: "COLOR", check: "Colour" }],
+      previousStatement: null, nextStatement: null, colour: C.ring },
+    { type: "kc_ring_set", message0: "リングの %1 番を %2 にする", args0: [num("N"), { type: "input_value", name: "COLOR", check: "Colour" }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.ring, tooltip: "0番が12時、時計回りに11番まで。12以上はまた0番から" },
+    { type: "kc_ring_clear", message0: "リングを全部けす", previousStatement: null, nextStatement: null, colour: C.ring },
+
+    { type: "kc_colour", message0: "%1", args0: [{ type: "field_colour", name: "C", colour: "#ff3c96" }], output: "Colour", colour: C.colour },
+    { type: "kc_wheel", message0: "にじ色の %1 番", args0: [num("N")], output: "Colour", colour: C.colour, inputsInline: true,
+      tooltip: "0〜11で赤→黄→緑→青→紫と変わる。12でまた赤" },
+    { type: "kc_rgb", message0: "赤 %1 緑 %2 青 %3", args0: [num("R"), num("G"), num("B")], output: "Colour", colour: C.colour, inputsInline: true,
+      tooltip: "それぞれ0〜255" },
+
+    { type: "kc_bar_level", message0: "バーを下から %1 個つける", args0: [num("N")], inputsInline: true,
+      previousStatement: null, nextStatement: null, colour: C.bar, tooltip: "0〜10。メーターのように使えます" },
+    { type: "kc_bar_set", message0: "バーの %1 番を %2", args0: [num("N"), { type: "field_dropdown", name: "ON", options: [["つける", "255"], ["けす", "0"]] }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.bar, tooltip: "0番が一番下、9番が一番上" },
+    { type: "kc_bar_clear", message0: "バーを全部けす", previousStatement: null, nextStatement: null, colour: C.bar },
+
+    { type: "kc_wait", message0: "%1 秒まつ", args0: [num("S")], inputsInline: true,
+      previousStatement: null, nextStatement: null, colour: C.wait, tooltip: "ここまでの光り方を見せてから待ちます" },
+
+    { type: "kc_shaken", message0: "ふった？", output: "Boolean", colour: C.sensor },
+    { type: "kc_tapped", message0: "コツンとたたいた？", output: "Boolean", colour: C.sensor },
+    { type: "kc_tilt", message0: "かたむき %1", args0: [{ type: "field_dropdown", name: "AXIS", options: [["左右", "0"], ["前後", "1"]] }],
+      output: "Number", colour: C.sensor, tooltip: "まっすぐ置くと0。かたむけると −100〜100" },
+    { type: "kc_temp", message0: "温度（℃）", output: "Number", colour: C.sensor, tooltip: "基板の熱で少し高めに出ます" },
+    { type: "kc_hum", message0: "湿度（％）", output: "Number", colour: C.sensor },
+  ]);
+  for (const t of ["kc_setup", "kc_loop"]) {
+    const init = Blockly.Blocks[t].init;
+    Blockly.Blocks[t].init = function () { init.call(this); this.setDeletable(false); };
+  }
+
+  const G = python.pythonGenerator, O = python.Order;
+  G.INDENT = "    ";
+  const v = (b, name, d) => G.valueToCode(b, name, O.NONE) || d;
+  const F = G.forBlock;
+  F.kc_setup = F.kc_loop = () => "";
+  F.kc_ring_fill = (b) => `ring.fill(${v(b, "COLOR", "(0, 0, 0)")})\n`;
+  F.kc_ring_set = (b) => `ring.set(int(${v(b, "N", "0")}), ${v(b, "COLOR", "(0, 0, 0)")})\n`;
+  F.kc_ring_clear = () => "ring.clear()\n";
+  F.kc_colour = (b) => {
+    const h = b.getFieldValue("C");
+    return [`(${parseInt(h.slice(1, 3), 16)}, ${parseInt(h.slice(3, 5), 16)}, ${parseInt(h.slice(5, 7), 16)})`, O.ATOMIC];
+  };
+  F.kc_wheel = (b) => {
+    G.definitions_.kc_wheel = [
+      "def kc_wheel(n):",
+      "    h = int(n) % 12 * 21",
+      "    if h < 85:",
+      "        return (255 - h * 3, h * 3, 0)",
+      "    if h < 170:",
+      "        h -= 85",
+      "        return (0, 255 - h * 3, h * 3)",
+      "    h -= 170",
+      "    return (h * 3, 0, 255 - h * 3)"].join("\n");
+    return [`kc_wheel(${v(b, "N", "0")})`, O.FUNCTION_CALL];
+  };
+  F.kc_rgb = (b) => {
+    G.definitions_.kc_c = "def kc_c(x):\n    return max(0, min(255, int(x)))";
+    return [`(kc_c(${v(b, "R", "0")}), kc_c(${v(b, "G", "0")}), kc_c(${v(b, "B", "0")}))`, O.ATOMIC];
+  };
+  F.kc_bar_level = (b) => `bar.level(${v(b, "N", "0")})\n`;
+  F.kc_bar_set = (b) => `bar.set(int(${v(b, "N", "0")}), ${b.getFieldValue("ON")})\n`;
+  F.kc_bar_clear = () => "bar.clear()\n";
+  F.kc_wait = (b) => `ring.show()\ntime.sleep_ms(int(${v(b, "S", "1")} * 1000))\n`;
+  F.kc_shaken = () => ["sensor.shaken()", O.FUNCTION_CALL];
+  F.kc_tapped = () => ["sensor.tapped()", O.FUNCTION_CALL];
+  F.kc_tilt = (b) => [`int(sensor.acceleration()[${b.getFieldValue("AXIS")}] * 100)`, O.FUNCTION_CALL];
+  F.kc_temp = () => ["round(sensor.temperature())", O.FUNCTION_CALL];
+  F.kc_hum = () => ["round(sensor.humidity())", O.FUNCTION_CALL];
+  // 標準の「〜を増やす」は MicroPython に無い numbers を使うので置きかえる
+  F.math_change = (b) => {
+    const name = G.nameDB_.getName(b.getFieldValue("VAR"), Blockly.Names.NameType.VARIABLE);
+    return `${name} = (${name} or 0) + ${G.valueToCode(b, "DELTA", O.ADDITIVE) || "0"}\n`;
+  };
+}
+
+const TOOLBOX = {
+  kind: "categoryToolbox",
+  contents: [
+    { kind: "category", name: "リング", colour: C.ring, contents: [
+      { kind: "block", type: "kc_ring_fill", inputs: { COLOR: COL("#ff3c96") } },
+      { kind: "block", type: "kc_ring_set", inputs: { N: N(0), COLOR: COL("#0050ff") } },
+      { kind: "block", type: "kc_ring_clear" },
+    ] },
+    { kind: "category", name: "色", colour: C.colour, contents: [
+      { kind: "block", type: "kc_colour" },
+      { kind: "block", type: "kc_wheel", inputs: { N: N(0) } },
+      { kind: "block", type: "kc_rgb", inputs: { R: N(255), G: N(60), B: N(150) } },
+    ] },
+    { kind: "category", name: "バー", colour: C.bar, contents: [
+      { kind: "block", type: "kc_bar_level", inputs: { N: N(5) } },
+      { kind: "block", type: "kc_bar_set", inputs: { N: N(0) } },
+      { kind: "block", type: "kc_bar_clear" },
+    ] },
+    { kind: "category", name: "まつ・くりかえし", colour: C.wait, contents: [
+      { kind: "block", type: "kc_wait", inputs: { S: N(0.1) } },
+      { kind: "block", type: "controls_repeat_ext", inputs: { TIMES: N(3) } },
+      { kind: "block", type: "controls_for", inputs: { FROM: N(0), TO: N(11), BY: N(1) } },
+    ] },
+    { kind: "category", name: "もし", colour: "#4a9b4f", contents: [
+      { kind: "block", type: "controls_if" },
+      { kind: "block", type: "controls_if", extraState: { hasElse: true } },
+      { kind: "block", type: "logic_compare", inputs: { A: N(0), B: N(0) } },
+      { kind: "block", type: "logic_operation" },
+      { kind: "block", type: "logic_negate" },
+    ] },
+    { kind: "category", name: "センサー", colour: C.sensor, contents: [
+      { kind: "block", type: "kc_shaken" },
+      { kind: "block", type: "kc_tapped" },
+      { kind: "block", type: "kc_tilt" },
+      { kind: "block", type: "kc_temp" },
+      { kind: "block", type: "kc_hum" },
+    ] },
+    { kind: "category", name: "数", colour: "#5b67a5", contents: [
+      { kind: "block", type: "math_number", fields: { NUM: 0 } },
+      { kind: "block", type: "math_arithmetic", inputs: { A: N(1), B: N(1) } },
+      { kind: "block", type: "math_random_int", inputs: { FROM: N(0), TO: N(11) } },
+    ] },
+    { kind: "category", name: "へんすう", colour: "#a5745b", custom: "VARIABLE" },
+  ],
+};
+
+// ---- ブロックのサンプル（そのまま基板で動く）
+const V = (id) => ({ block: { type: "variables_get", fields: { VAR: { id } } } });
+const withN = (id) => ({ shadow: N(0).shadow, block: V(id).block });
+const chain = (...bs) => bs.reduceRight((next, b) => (next ? { ...b, next: { block: next } } : b), null);
+const hats = (setup, loop) => [
+  { type: "kc_setup", x: 16, y: 16, ...(setup ? { inputs: { DO: { block: setup } } } : {}) },
+  { type: "kc_loop", x: 16, y: setup ? 130 : 90, inputs: { DO: { block: loop } } },
+];
+const setVar = (id, n) => ({ type: "variables_set", fields: { VAR: { id } }, inputs: { VALUE: { block: { type: "math_number", fields: { NUM: n } } } } });
+const change = (id, n) => ({ type: "math_change", fields: { VAR: { id } }, inputs: { DELTA: N(n) } });
+const wait = (s) => ({ type: "kc_wait", inputs: { S: N(s) } });
+
+const RAINBOW_SET = {                        // リングの i 番を にじ色の (i + ずれ) 番にする
+  type: "kc_ring_set",
+  inputs: {
+    N: withN("v2"),
+    COLOR: { block: { type: "kc_wheel", inputs: { N: { shadow: N(0).shadow,
+      block: { type: "math_arithmetic", fields: { OP: "ADD" }, inputs: { A: withN("v2"), B: withN("v1") } } } } } },
+  },
+};
+
+const BSAMPLES = {
+  "青の追いかけっこ": {
+    variables: [{ name: "いち", id: "v1" }],
+    blocks: hats(setVar("v1", 0), chain(
+      { type: "kc_ring_clear" },
+      { type: "kc_ring_set", inputs: { N: withN("v1"), COLOR: COL("#0050ff") } },
+      change("v1", 1),
+      wait(0.1))),
+  },
+  "虹がまわる": {
+    variables: [{ name: "ずれ", id: "v1" }, { name: "i", id: "v2" }],
+    blocks: hats(setVar("v1", 0), chain(
+      { type: "controls_for", fields: { VAR: { id: "v2" } }, inputs: { FROM: N(0), TO: N(11), BY: N(1), DO: { block: RAINBOW_SET } } },
+      change("v1", 1),
+      wait(0.15))),
+  },
+  "ふると色が変わる": {
+    variables: [{ name: "いろ", id: "v1" }],
+    blocks: hats(setVar("v1", 0), chain(
+      { type: "controls_if", inputs: { IF0: { block: { type: "kc_shaken" } },
+        DO0: { block: { type: "variables_set", fields: { VAR: { id: "v1" } }, inputs: { VALUE: { block: { type: "math_random_int", inputs: { FROM: N(0), TO: N(11) } } } } } } } },
+      { type: "kc_ring_fill", inputs: { COLOR: { block: { type: "kc_wheel", inputs: { N: withN("v1") } } } } },
+      wait(0.05))),
+  },
+  "かたむきメーター": {
+    variables: [],
+    blocks: hats(null, chain(
+      { type: "kc_bar_level", inputs: { N: { shadow: N(5).shadow, block: { type: "math_arithmetic", fields: { OP: "DIVIDE" }, inputs: {
+        A: { shadow: N(0).shadow, block: { type: "math_arithmetic", fields: { OP: "ADD" }, inputs: { A: { shadow: N(0).shadow, block: { type: "kc_tilt", fields: { AXIS: "0" } } }, B: N(100) } } },
+        B: N(20) } } } } },
+      wait(0.05))),
+  },
+};
+const toState = (s) => ({ blocks: { languageVersion: 0, blocks: s.blocks }, variables: s.variables });
+
+function blocksToPython() {
+  const G = python.pythonGenerator;
+  G.init(ws);
+  const tops = ws.getTopBlocks(true);
+  const body = (type) => { const b = tops.find((t) => t.type === type); return b ? G.statementToCode(b, "DO") : ""; };
+  const setupBody = body("kc_setup"), loopBody = body("kc_loop");
+  const vars = ws.getAllVariables().map((x) => ({ label: x.name, safe: G.nameDB_.getName(x.getId(), Blockly.Names.NameType.VARIABLE) }));
+  const defs = G.finish("").trim();
+  // 日本語の変数名は _E3_81_84 のような読めない名前になるので、var1, var2 … に置きかえて対応表を残す
+  let k = 0;
+  const names = vars.map((x) => (x.safe === x.label ? x.safe : (x.py = "var" + ++k)));
+  const legend = vars.filter((x) => x.py).map((x) => `# ${x.py} = 「${x.label}」`);
+  const glob = names.length ? `    global ${names.join(", ")}\n` : "";
+  const code = [
+    "# ブロックから作ったプログラム",
+    ...legend,
+    "from keychain import ring, bar, sensor",
+    "import time",
+    defs ? "\n" + defs : "",
+    "",
+    "def setup():",
+    glob + (setupBody || (glob ? "" : "    pass\n")).replace(/\n$/, ""),
+    "",
+    "",
+    "def loop():",
+    glob + loopBody + "    ring.show()\n    time.sleep_ms(20)",
+    "",
+  ].join("\n").replace(/\n{4,}/g, "\n\n\n");
+  return vars.filter((x) => x.py).sort((a, b) => b.safe.length - a.safe.length).reduce((s, x) => s.split(x.safe).join(x.py), code);
+}
+
+function refreshGenerated() {
+  if (!ws) return;
+  try { generated = blocksToPython(); } catch (e) { generated = ""; }
+  $("gen").textContent = generated;
+  updateSize();
+}
+
+function showTopLeft() {                    // ブロックの左上が画面の左上に来るように
+  const box = ws.getBlocksBoundingBox(), s = ws.scale;
+  ws.scroll(-box.left * s + 12, -box.top * s + 12);
+}
+
+function loadBlockSample(name) {
+  bSample = name;
+  Blockly.Events.disable();
+  try { Blockly.serialization.workspaces.load(toState(BSAMPLES[name]), ws); } finally { Blockly.Events.enable(); }
+  showTopLeft();
+  store.set("kc_ws", JSON.stringify(Blockly.serialization.workspaces.save(ws)));
+  renderChips(); refreshGenerated();
+}
+
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function makeTheme() {
+  return Blockly.Theme.defineTheme("kc" + Date.now(), {
+    base: Blockly.Themes.Classic,
+    componentStyles: {
+      workspaceBackgroundColour: css("--ws-bg"), toolboxBackgroundColour: css("--panel"), toolboxForegroundColour: css("--ink"),
+      flyoutBackgroundColour: css("--flyout"), flyoutForegroundColour: css("--ink"), flyoutOpacity: 1,
+      scrollbarColour: css("--line"), insertionMarkerColour: css("--ink"), insertionMarkerOpacity: 0.3,
+    },
+    fontStyle: { family: '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif', weight: "800", size: 11 },
+  });
+}
+
+function initBlockly() {
+  if (!window.Blockly || !window.python) {
+    $("blockly").innerHTML = '<div class="blockly-fail">ブロックの部品を読み込めませんでした。通信できる場所でページを開き直すか、「テキスト」タブを使ってください。</div>';
+    return;
+  }
+  defineBlocks();
+  const narrow = $("blockly").clientWidth < 560;            // スマホでは分類を上に横並び（ブロックを置く場所を広く）
+  ws = Blockly.inject($("blockly"), {
+    toolbox: TOOLBOX, renderer: "zelos", theme: makeTheme(), sounds: false, trashcan: false,
+    horizontalLayout: narrow, toolboxPosition: "start",
+    zoom: { controls: false, wheel: false, pinch: true, startScale: narrow ? 0.6 : 0.7, minScale: 0.3, maxScale: 1.4 },
+    move: { scrollbars: true, drag: true, wheel: true },
+  });
+  let ok = false;
+  const saved = store.get("kc_ws");
+  if (saved) {
+    try { Blockly.serialization.workspaces.load(JSON.parse(saved), ws); ok = ws.getTopBlocks().some((b) => b.type === "kc_loop"); } catch (e) { ok = false; }
+  }
+  if (!ok) loadBlockSample("青の追いかけっこ");
+  else showTopLeft();
+  ws.addChangeListener((e) => {
+    if (e.isUiEvent) return;
+    if (!ws.getTopBlocks().some((b) => b.type === "kc_loop") && !ws.isDragging()) { loadBlockSample(bSample || "青の追いかけっこ"); return; }
+    store.set("kc_ws", JSON.stringify(Blockly.serialization.workspaces.save(ws)));
+    if (bSample && e.type !== Blockly.Events.FINISHED_LOADING) { bSample = null; renderChips(); }
+    refreshGenerated();
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => ws.setTheme(makeTheme()));
+  new MutationObserver(() => ws.setTheme(makeTheme())).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  refreshGenerated();
+}
+
+// ================================================================ 画面
+function renderChips() {
+  const make = (box, names, active, onPick) => {
+    box.innerHTML = "";
+    for (const name of names) {
+      const b = document.createElement("button");
+      b.className = "chip"; b.type = "button"; b.textContent = name;
+      b.setAttribute("aria-pressed", String(name === active));
+      b.onclick = () => onPick(name);
+      box.appendChild(b);
+    }
+  };
+  make($("tsamples"), Object.keys(SAMPLES), tSample, (n) => { tSample = n; $("src").value = SAMPLES[n]; store.set("kc_src", SAMPLES[n]); renderChips(); updateSize(); });
+  if (ws) make($("bsamples"), Object.keys(BSAMPLES), bSample, loadBlockSample);
+}
+
+function currentSource() { return mode === "block" ? generated : $("src").value; }
+function updateSize() {
+  const n = enc.encode(currentSource()).length, over = n > USER_MAX || n === 0;
+  $("size").innerHTML = over
+    ? `<span class="bad">${n === 0 ? "プログラムが空です" : `大きすぎます（${n.toLocaleString()} / ${USER_MAX.toLocaleString()} バイト）`}</span>`
+    : `${n.toLocaleString()} / ${USER_MAX.toLocaleString()} バイト`;
+  $("modeinfo").textContent = mode === "block" ? "保存されるのは：ブロック" : "保存されるのは：テキスト";
+  $("save").disabled = over;
+}
+
+function setMode(m) {
+  mode = m; store.set("kc_mode", m);
+  $("tab-block").setAttribute("aria-selected", String(m === "block"));
+  $("tab-text").setAttribute("aria-selected", String(m === "text"));
+  $("pane-block").hidden = m !== "block";
+  $("pane-text").hidden = m !== "text";
+  if (m === "block" && ws) Blockly.svgResize(ws);
+  updateSize();
+}
+$("tab-block").onclick = () => setMode("block");
+$("tab-text").onclick = () => setMode("text");
+$("to-text").onclick = () => {
+  if (!generated) return;
+  $("src").value = generated; store.set("kc_src", generated); tSample = null; renderChips(); setMode("text");
+};
+
+const savedSrc = store.get("kc_src");
+$("src").value = savedSrc || SAMPLES[tSample];
+if (savedSrc && savedSrc !== SAMPLES[tSample]) tSample = null;
+$("src").addEventListener("input", () => {
+  store.set("kc_src", $("src").value);
+  if (tSample && $("src").value !== SAMPLES[tSample]) { tSample = null; renderChips(); }
+  updateSize();
+});
+
+// ブロック画面は見えている状態で作る（隠れたまま作ると大きさが0になる）
+$("pane-block").hidden = false;
+initBlockly();
+renderChips();
+setMode(mode);
+
+$("save").addEventListener("click", async () => {
+  const src = enc.encode(currentSource().replace(/\r\n/g, "\n"));
+  const uf2 = toUf2(programBlob(src), USER_ADDR);
+  const dl = window.claude?.use ? await window.claude.use("downloads") : null;
+  if (!dl) {                                 // claude.ai 以外（自社サイトなど）に置いたとき：ふつうのダウンロード
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([uf2], { type: "application/octet-stream" }));
+    a.download = "keychain_program.uf2";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    setStatus(`keychain_program.uf2 を保存しました（${uf2.length.toLocaleString()} バイト）。次は ③ のとおり RPI-RP2 へコピーします。`, "ok");
+    return;
+  }
+  try {
+    await dl.save({ filename: "keychain_program.txt", data: uf2 });
+    setStatus(`保存しました（${uf2.length.toLocaleString()} バイト）。次は ③ のとおり RPI-RP2 へコピーします。`, "ok");
+  } catch (e) {
+    const code = e && e.code;
+    if (code === "declined") setStatus("保存を取りやめました。", "");
+    else if (code === "rate_limited") setStatus("保存の確認が開いています。少し待ってからもう一度押してください。", "err");
+    else setStatus("保存できませんでした（" + (code || "不明") + "）。", "err");
+  }
+});
+
+// ---- 見出しのリング（12個のLEDを虹色でゆっくり回す）
+(() => {
+  const cv = $("ring"), ctx = cv.getContext("2d");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let t = 0;
+  function frame() {
+    ctx.clearRect(0, 0, 128, 128);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 - Math.PI / 2, x = 64 + Math.cos(a) * 46, y = 64 + Math.sin(a) * 46;
+      ctx.fillStyle = `hsl(${(i * 30 + t) % 360} 90% 60%)`;
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+    }
+    t = (t + 1.2) % 360;
+    if (!still) requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
+
+</html>
