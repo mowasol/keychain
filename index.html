@@ -64,6 +64,9 @@ details { font-size: .9rem; }
 summary { cursor: pointer; color: var(--sub); }
 pre { margin: 8px 0 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--f-code); font-size: 12px; line-height: 1.55; padding: 12px; border-radius: 10px; overflow-x: auto; max-height: 320px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.imp { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; min-width: 0; }
+.imp textarea { min-height: 180px; }
+.ghost.primary { background: var(--pink-soft); border-color: var(--pink); font-weight: 700; }
 .ghost { font: inherit; font-size: .88rem; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
 textarea { width: 100%; box-sizing: border-box; min-height: 300px; resize: vertical; font-family: var(--f-code); font-size: 13px; line-height: 1.55;
   background: var(--code-bg); color: var(--code-fg); border: none; border-radius: 10px; padding: 12px; tab-size: 4; }
@@ -104,13 +107,32 @@ code { font-family: var(--f-code); font-size: .88em; }
         <summary>できたプログラム（Python）を見る</summary>
         <pre id="gen"></pre>
       </details>
-      <div class="row"><button class="ghost" id="to-text" type="button">このプログラムをテキストで続きを書く</button></div>
+      <div class="row">
+        <button class="ghost" id="to-text" type="button">このプログラムをテキストで続きを書く</button>
+        <button class="ghost" id="imp-open" type="button" aria-expanded="false">Python からブロックにする</button>
+        <button class="ghost" id="imp-undo" type="button" hidden>前のブロックにもどす</button>
+      </div>
+      <div class="imp" id="imp" hidden>
+        <p class="note">Gemma3 などのAIが書いた Python を下に貼りつけて「ブロックにする」を押します。AIの答えをまるごと貼っても、<code>```python</code> の中だけを使います。今のブロックは置きかわります。</p>
+        <textarea id="imp-src" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="ブロックにする Python" placeholder="ここに Python を貼りつけ"></textarea>
+        <div class="row">
+          <button class="ghost primary" id="imp-go" type="button">ブロックにする</button>
+          <button class="ghost" id="imp-copy" type="button">AIに渡すお願い文をコピー</button>
+        </div>
+        <p class="status" id="imp-msg" role="status"></p>
+        <details>
+          <summary>AIに渡すお願い文（この決まりで書いてもらうと、ほとんど全部ブロックになります）</summary>
+          <pre id="imp-prompt"></pre>
+        </details>
+      </div>
     </div>
 
     <div class="pane" id="pane-text" hidden>
       <div class="samples" id="tsamples"></div>
       <textarea id="src" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="プログラム"></textarea>
       <div class="meta"><span>setup() は最初に1回、loop() はずっと繰り返し</span></div>
+      <div class="row"><button class="ghost" id="text-to-block" type="button">このプログラムをブロックにする</button></div>
+      <p class="status" id="t2b-msg" role="status"></p>
     </div>
     <div class="meta"><span id="size"></span><span id="modeinfo"></span></div>
   </section>
@@ -269,7 +291,7 @@ let tSample = "虹がまわる", bSample = null, ws = null, generated = "";
 function setStatus(text, cls) { $("status").textContent = text; $("status").className = "status " + (cls || ""); }
 
 // ================================================================ ブロック
-const C = { ring: "#d6407f", colour: "#a855c9", bar: "#e08a2c", wait: "#3f8fd2", sensor: "#22a39a", hat: "#5b6070" };
+const C = { ring: "#d6407f", colour: "#a855c9", bar: "#e08a2c", wait: "#3f8fd2", sensor: "#22a39a", hat: "#5b6070", py: "#7d848c" };
 const N = (v) => ({ shadow: { type: "math_number", fields: { NUM: v } } });
 const COL = (hex) => ({ shadow: { type: "kc_colour", fields: { C: hex } } });
 
@@ -313,6 +335,14 @@ function defineBlocks() {
       output: "Number", colour: C.sensor, tooltip: "まっすぐ置くと0。かたむけると −100〜100" },
     { type: "kc_temp", message0: "温度（℃）", output: "Number", colour: C.sensor, tooltip: "基板の熱で少し高めに出ます" },
     { type: "kc_hum", message0: "湿度（％）", output: "Number", colour: C.sensor },
+
+    // ブロックにできなかった Python をそのまま持つブロック（灰色）
+    { type: "kc_py", message0: "Pythonのまま %1", args0: [{ type: "field_multilinetext", name: "CODE", text: "pass", spellcheck: false }],
+      previousStatement: null, nextStatement: null, colour: C.py, tooltip: "ブロックにできなかった Python。そのまま実行されます" },
+    { type: "kc_py_expr", message0: "%1", args0: [{ type: "field_input", name: "CODE", text: "0", spellcheck: false }],
+      output: null, colour: C.py, tooltip: "ブロックにできなかった Python の式。そのまま計算されます" },
+    { type: "kc_py_top", message0: "じゅんび（Pythonのまま） %1 %2", args0: [{ type: "input_dummy" }, { type: "field_multilinetext", name: "CODE", text: "", spellcheck: false }],
+      colour: C.py, tooltip: "setup / loop の外に置く Python（import や自分で作った関数など）" },
   ]);
   for (const t of ["kc_setup", "kc_loop"]) {
     const init = Blockly.Blocks[t].init;
@@ -357,6 +387,9 @@ function defineBlocks() {
   F.kc_tilt = (b) => [`int(sensor.acceleration()[${b.getFieldValue("AXIS")}] * 100)`, O.FUNCTION_CALL];
   F.kc_temp = () => ["round(sensor.temperature())", O.FUNCTION_CALL];
   F.kc_hum = () => ["round(sensor.humidity())", O.FUNCTION_CALL];
+  F.kc_py = (b) => b.getFieldValue("CODE").replace(/\s+$/, "") + "\n";
+  F.kc_py_expr = (b) => [b.getFieldValue("CODE"), O.NONE];
+  F.kc_py_top = () => "";
   // 標準の「〜を増やす」は MicroPython に無い numbers を使うので置きかえる
   F.math_change = (b) => {
     const name = G.nameDB_.getName(b.getFieldValue("VAR"), Blockly.Names.NameType.VARIABLE);
@@ -474,6 +507,7 @@ function blocksToPython() {
   const setupBody = body("kc_setup"), loopBody = body("kc_loop");
   const vars = ws.getAllVariables().map((x) => ({ label: x.name, safe: G.nameDB_.getName(x.getId(), Blockly.Names.NameType.VARIABLE) }));
   const defs = G.finish("").trim();
+  const extra = tops.filter((t) => t.type === "kc_py_top").map((t) => t.getFieldValue("CODE").trim()).filter(Boolean).join("\n\n");
   // 日本語の変数名は _E3_81_84 のような読めない名前になるので、var1, var2 … に置きかえて対応表を残す
   let k = 0;
   const names = vars.map((x) => (x.safe === x.label ? x.safe : (x.py = "var" + ++k)));
@@ -485,6 +519,7 @@ function blocksToPython() {
     "from keychain import ring, bar, sensor",
     "import time",
     defs ? "\n" + defs : "",
+    extra ? "\n" + extra : "",
     "",
     "def setup():",
     glob + (setupBody || (glob ? "" : "    pass\n")).replace(/\n$/, ""),
@@ -563,6 +598,532 @@ function initBlockly() {
   refreshGenerated();
 }
 
+// ================================================================ Python → ブロック
+// AI（Gemma3 など）や自分で書いた Python を、このページのブロックに組み立て直す。
+// 決まった形の命令だけをブロックにし、それ以外は「Pythonのまま」ブロックに入れる（動きは変えない）。
+const AI_PROMPT = `光るキーホルダー基板（MicroPython）用のプログラムを書いてください。
+次の決まりを必ず守り、説明は短くして、コードは \`\`\`python の中に書いてください。
+
+【形】
+from keychain import ring, bar, sensor
+import time
+
+（変数はここで 0 などを入れて作る）
+
+def setup():        # 最初に1回だけ動く
+    global 変数名
+
+def loop():         # ずっとくりかえし呼ばれる。while True は書かない
+    global 変数名
+
+【使ってよい命令】
+ring.fill((赤, 緑, 青))      リング12個を全部同じ色に（それぞれ 0〜255）
+ring.set(番号, (赤, 緑, 青))  リングの1個（0番が12時、時計回りに11番まで）
+ring.clear()                リングを全部けす
+ring.show()                 ここまでの色を光らせる
+bar.level(n)                LEDバーを下から n 個つける（0〜10）
+bar.set(番号) / bar.set(番号, 0)   バーの1個をつける／けす（0番が一番下、9番が一番上）
+bar.clear()                 バーを全部けす
+time.sleep(秒)              待つ（その前に ring.show() する）
+sensor.shaken()             ふっている間 True
+sensor.tapped()             コツンとたたいたら True
+int(sensor.acceleration()[0] * 100)   左右のかたむき −100〜100（[1] にすると前後）
+sensor.temperature()        温度（℃）
+sensor.humidity()           湿度（％）
+random.randint(a, b)        a〜b のどれか（使うときは import random）
+
+【使ってよい書き方】
+変数 = 式、変数 += 数、if / elif / else、for i in range(...)、for _ in range(回数)、
++ - * / %、== != < <= > >=、and / or / not
+while、自分で作る関数（def）、リスト、文字列、print は使わない。
+
+【作ってほしいもの】
+（ここに、どんな光り方にしたいかを書く）`;
+
+const PyToBlocks = (() => {
+  const OPS = ["**", "//", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "<", ">", "+", "-", "*", "/", "%",
+               "(", ")", "[", "]", "{", "}", ",", ".", ":", "="];
+  const KW = ["and", "or", "not", "if", "else", "in", "is", "lambda", "for"];
+
+  // ---- 1行ぶんの式を字（トークン）に分ける
+  function tokenize(s) {
+    const out = [];
+    let i = 0;
+    while (i < s.length) {
+      const c = s[i];
+      if (c === " ") { i++; continue; }
+      const rest = s.slice(i);
+      let m;
+      if ((m = /^(0x[0-9a-fA-F]+|(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?)/.exec(rest))) {
+        out.push({ k: "num", v: Number(m[0]), s: i, e: i + m[0].length }); i += m[0].length; continue;
+      }
+      if ((m = /^[A-Za-z_\u0080-￿][\w\u0080-￿]*/.exec(rest))) {
+        out.push({ k: "name", v: m[0], s: i, e: i + m[0].length }); i += m[0].length; continue;
+      }
+      if (c === '"' || c === "'") {
+        let j = i + 1;
+        while (j < s.length && s[j] !== c) j += s[j] === "\\" ? 2 : 1;
+        out.push({ k: "str", s: i, e: j + 1 }); i = j + 1; continue;
+      }
+      const op = OPS.find((o) => rest.startsWith(o));
+      if (!op) throw new Error("tok");
+      out.push({ k: "op", v: op, s: i, e: i + op.length }); i += op.length;
+    }
+    return out;
+  }
+
+  // ---- 式を木にする（Python の優先順位どおり）
+  function parseExpr(text) {
+    const t = tokenize(text);
+    let p = 0;
+    const peek = () => t[p];
+    const isOp = (v) => t[p] && t[p].k === "op" && t[p].v === v;
+    const isKw = (v) => t[p] && t[p].k === "name" && t[p].v === v;
+    const expect = (v) => { if (!isOp(v)) throw new Error("expect " + v); return t[p++]; };
+    function primary() {
+      const a = t[p++];
+      if (!a) throw new Error("end");
+      let n;
+      if (a.k === "num") n = { t: "num", v: a.v, s: a.s, e: a.e };
+      else if (a.k === "str") n = { t: "str", s: a.s, e: a.e };
+      else if (a.k === "name") { if (KW.includes(a.v)) throw new Error("kw"); n = { t: "name", v: a.v, s: a.s, e: a.e }; }
+      else if (a.v === "(" || a.v === "[") {
+        const close = a.v === "(" ? ")" : "]", items = [];
+        let comma = false;
+        while (!isOp(close)) { items.push(expr()); if (!isOp(",")) break; p++; comma = true; }
+        const c = expect(close);
+        n = a.v === "[" ? { t: "list", items, s: a.s, e: c.e }
+          : comma || !items.length ? { t: "tuple", items, s: a.s, e: c.e } : { t: "paren", x: items[0], s: a.s, e: c.e };
+      } else throw new Error("unexpected");
+      for (;;) {
+        if (isOp("(")) {
+          p++;
+          const args = [];
+          while (!isOp(")")) {
+            if (t[p] && t[p].k === "name" && t[p + 1] && t[p + 1].k === "op" && t[p + 1].v === "=") throw new Error("kwarg");
+            args.push(expr());
+            if (!isOp(",")) break;
+            p++;
+          }
+          const c = expect(")");
+          n = { t: "call", f: n, args, s: n.s, e: c.e };
+        } else if (isOp(".")) {
+          p++;
+          const nm = t[p++];
+          if (!nm || nm.k !== "name") throw new Error("attr");
+          n = { t: "attr", o: n, n: nm.v, s: n.s, e: nm.e };
+        } else if (isOp("[")) {
+          p++;
+          const i = expr(), c = expect("]");
+          n = { t: "idx", o: n, i, s: n.s, e: c.e };
+        } else break;
+      }
+      return n;
+    }
+    function unary() {
+      if (isOp("-") || isOp("+")) { const a = t[p++], x = unary(); return { t: "un", op: a.v, x, s: a.s, e: x.e }; }
+      const b = primary();
+      if (isOp("**")) { p++; const x = unary(); return { t: "bin", op: "**", a: b, b: x, s: b.s, e: x.e }; }
+      return b;
+    }
+    const level = (sub, ops) => () => {
+      let a = sub();
+      while (peek() && peek().k === "op" && ops.includes(peek().v)) {
+        const op = t[p++].v, b = sub();
+        a = { t: "bin", op, a, b, s: a.s, e: b.e };
+      }
+      return a;
+    };
+    const term = level(unary, ["*", "/", "//", "%"]);
+    const arith = level(term, ["+", "-"]);
+    function comparison() {
+      const a = arith(), ops = [], rest = [];
+      while (peek() && peek().k === "op" && ["==", "!=", "<", "<=", ">", ">="].includes(peek().v)) { ops.push(t[p++].v); rest.push(arith()); }
+      if (isKw("in") || isKw("is") || (isKw("not") && ops.length === 0 && t[p + 1] && t[p + 1].v === "in")) throw new Error("in/is");
+      if (!ops.length) return a;
+      const e = rest[rest.length - 1].e;
+      return ops.length > 1 ? { t: "raw", s: a.s, e } : { t: "cmp", op: ops[0], a, b: rest[0], s: a.s, e };
+    }
+    function notExpr() {
+      if (isKw("not")) { const a = t[p++], x = notExpr(); return { t: "not", x, s: a.s, e: x.e }; }
+      return comparison();
+    }
+    const kwLevel = (sub, kw) => () => {
+      let a = sub();
+      while (isKw(kw)) { p++; const b = sub(); a = { t: "logic", op: kw, a, b, s: a.s, e: b.e }; }
+      return a;
+    };
+    const andExpr = kwLevel(notExpr, "and");
+    const orExpr = kwLevel(andExpr, "or");
+    function expr() { const x = orExpr(); if (isKw("if")) throw new Error("ternary"); return x; }
+    const x = expr();
+    if (p < t.length) throw new Error("rest");
+    return x;
+  }
+
+  // ---- 行をまとめる（かっこの中の改行・\ の続き・三重引用符をつなげ、# の後ろを外す）
+  function logicalLines(src) {
+    const phys = src.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").split("\n");
+    const out = [];
+    let cur = null, depth = 0, q = null;
+    phys.forEach((line, ln) => {
+      let code = "", j = 0;
+      while (j < line.length) {
+        const c = line[j];
+        if (q) {
+          if (c === "\\") { code += line.substr(j, 2); j += 2; continue; }
+          if (line.startsWith(q, j)) { code += q; j += q.length; q = null; continue; }
+          code += c; j++; continue;
+        }
+        if (c === "#") break;
+        if (c === '"' || c === "'") { q = line.startsWith(c.repeat(3), j) ? c.repeat(3) : c; code += q; j += q.length; continue; }
+        if ("([{".includes(c)) depth++;
+        else if (")]}".includes(c)) depth = Math.max(0, depth - 1);
+        code += c; j++;
+      }
+      if (q && q.length === 1) q = null;
+      const back = /\\\s*$/.test(code);
+      const cont = !!q || depth > 0 || back;
+      const piece = code.replace(/\\\s*$/, "").trim();
+      if (!cur) {
+        if (!piece) return;
+        cur = { indent: line.search(/\S/), code: "", from: ln, to: ln };
+      }
+      if (piece) cur.code += (cur.code && !/[([{]$/.test(cur.code) && !/^[)\]}]/.test(piece) ? " " : "") + piece;
+      cur.to = ln;
+      if (!cont) { out.push(cur); cur = null; }
+    });
+    if (cur && cur.code) out.push(cur);
+    return { lines: out, phys };
+  }
+
+  function buildTree(lines) {
+    const root = { indent: -1, children: [] }, stack = [root];
+    for (const l of lines) {
+      const node = { ...l, children: [] };
+      while (stack.length > 1 && l.indent <= stack[stack.length - 1].indent) stack.pop();
+      stack[stack.length - 1].children.push(node);
+      if (/:$/.test(l.code)) stack.push(node);
+    }
+    return root.children;
+  }
+
+  const lastLine = (n) => (n.children.length ? lastLine(n.children[n.children.length - 1]) : n.to);
+
+  // ---- 変換の本体
+  function convert(input) {
+    const fence = /```[ \t]*(?:python|py|micropython)?[ \t]*\n([\s\S]*?)```/i.exec(input);
+    const src = fence ? fence[1] : input;
+    const legend = {};
+    for (const m of src.matchAll(/^#\s*(var\d+)\s*=\s*「(.+?)」\s*$/gm)) legend[m[1]] = m[2];
+    const generated = /^#\s*ブロックから作ったプログラム/m.test(src);
+    const { lines, phys } = logicalLines(src);
+    const tree = buildTree(lines);
+
+    const vars = new Map();
+    const varId = (name) => { if (!vars.has(name)) vars.set(name, "py" + vars.size); return vars.get(name); };
+    let made = 0, raws = 0;
+    const rawText = (from, to, indent) => {
+      const ls = phys.slice(from, to + 1).map((l) => (l.slice(0, indent).trim() ? l : l.slice(indent)));
+      while (ls.length && !ls[ls.length - 1].trim()) ls.pop();
+      return ls.join("\n");
+    };
+    const rawTexts = [];
+    const rawStmt = (from, to, indent) => { raws++; const t = rawText(from, to, indent); rawTexts.push(t); return { type: "kc_py", fields: { CODE: t } }; };
+
+    // ---- 式 → ブロック
+    const numv = (n) => n.t === "num" ? n.v : n.t === "paren" ? numv(n.x)
+      : n.t === "un" && n.x.t === "num" ? (n.op === "-" ? -n.x.v : n.x.v) : null;
+    const numBlock = (v) => ({ type: "math_number", fields: { NUM: v } });
+    const isCall = (n, obj, fn) => n.t === "call" && n.f.t === "attr" && n.f.o.t === "name" && n.f.o.v === obj && n.f.n === fn;
+    const isFn = (n, fn, argc) => n.t === "call" && n.f.t === "name" && n.f.v === fn && n.args.length === argc;
+    const strip = (n, fn) => (isFn(n, fn, 1) ? n.args[0] : n.t === "paren" ? strip(n.x, fn) : n);
+
+    function ex(n, text) {
+      const k = numv(n);
+      if (k !== null) { made++; return numBlock(k); }
+      const raw = () => { raws++; const t = text.slice(n.s, n.e); rawTexts.push(t); return { type: "kc_py_expr", fields: { CODE: t } }; };
+      const two = (type, op, A, B, a, b) => {
+        made++;
+        return { type, ...(op ? { fields: { OP: op } } : {}), inputs: { [A]: val(a, text, 0), [B]: val(b, text, 0) } };
+      };
+      switch (n.t) {
+        case "paren": return ex(n.x, text);
+        case "name":
+          made++;
+          if (n.v === "True" || n.v === "False") return { type: "logic_boolean", fields: { BOOL: n.v.toUpperCase() } };
+          if (n.v === "None") { made--; return raw(); }
+          return { type: "variables_get", fields: { VAR: { id: varId(n.v) } } };
+        case "bin": {
+          const ar = { "+": "ADD", "-": "MINUS", "*": "MULTIPLY", "/": "DIVIDE", "**": "POWER" }[n.op];
+          if (ar) return two("math_arithmetic", ar, "A", "B", n.a, n.b);
+          if (n.op === "%") return two("math_modulo", null, "DIVIDEND", "DIVISOR", n.a, n.b);
+          if (n.op === "//") {
+            made++;
+            return { type: "math_round", fields: { OP: "ROUNDDOWN" }, inputs: { NUM: { block: two("math_arithmetic", "DIVIDE", "A", "B", n.a, n.b) } } };
+          }
+          return raw();
+        }
+        case "un":
+          if (n.op === "+") return ex(n.x, text);
+          made++;
+          return { type: "math_single", fields: { OP: "NEG" }, inputs: { NUM: val(n.x, text, 0) } };
+        case "cmp":
+          return two("logic_compare", { "==": "EQ", "!=": "NEQ", "<": "LT", "<=": "LTE", ">": "GT", ">=": "GTE" }[n.op], "A", "B", n.a, n.b);
+        case "logic":
+          made++;
+          return { type: "logic_operation", fields: { OP: n.op.toUpperCase() }, inputs: { A: { block: ex(n.a, text) }, B: { block: ex(n.b, text) } } };
+        case "not":
+          made++;
+          return { type: "logic_negate", inputs: { BOOL: { block: ex(n.x, text) } } };
+        case "call": {
+          const a = n.args;
+          if (isCall(n, "sensor", "shaken") && !a.length) { made++; return { type: "kc_shaken" }; }
+          if (isCall(n, "sensor", "tapped") && !a.length) { made++; return { type: "kc_tapped" }; }
+          if (isFn(n, "round", 1) && !a[0].args?.length && (isCall(a[0], "sensor", "temperature") || isCall(a[0], "sensor", "humidity"))) return ex(a[0], text);
+          if (isCall(n, "sensor", "temperature") && !a.length) { made++; return { type: "kc_temp" }; }
+          if (isCall(n, "sensor", "humidity") && !a.length) { made++; return { type: "kc_hum" }; }
+          if (isCall(n, "random", "randint") && a.length === 2) return two("math_random_int", null, "FROM", "TO", a[0], a[1]);
+          if (isFn(n, "kc_wheel", 1)) { made++; return { type: "kc_wheel", inputs: { N: val(a[0], text, 0) } }; }
+          if (isFn(n, "kc_c", 1)) return ex(a[0], text);
+          if (isFn(n, "abs", 1)) { made++; return { type: "math_single", fields: { OP: "ABS" }, inputs: { NUM: val(a[0], text, 0) } }; }
+          if (isFn(n, "int", 1)) {                                   // int(sensor.acceleration()[軸] * 100) → かたむき
+            const m = a[0].t === "paren" ? a[0].x : a[0];
+            if (m.t === "bin" && m.op === "*" && numv(m.b) === 100 && m.a.t === "idx" && isCall(m.a.o, "sensor", "acceleration")
+                && !m.a.o.args.length && [0, 1].includes(numv(m.a.i))) {
+              made++;
+              return { type: "kc_tilt", fields: { AXIS: String(numv(m.a.i)) } };
+            }
+          }
+          return raw();
+        }
+        default: return raw();
+      }
+    }
+    // 値の差しこみ口：数字だけなら書きかえられる数字、それ以外はブロック
+    function val(n, text, shadow) {
+      const k = numv(n);
+      if (k !== null) { made++; return { shadow: numBlock(k) }; }
+      return { block: ex(n, text), ...(shadow !== undefined ? { shadow: numBlock(shadow) } : {}) };
+    }
+    function colour(n, text) {
+      const m = n.t === "paren" ? n.x : n;
+      if (m.t === "tuple" && m.items.length === 3) {
+        const ks = m.items.map((x) => numv(strip(x, "kc_c")));
+        made++;
+        if (ks.every((x) => x !== null)) {
+          const hex = "#" + ks.map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, "0")).join("");
+          return { shadow: { type: "kc_colour", fields: { C: hex } } };
+        }
+        const [r, g, b] = m.items.map((x) => val(strip(x, "kc_c"), text, 0));
+        return { block: { type: "kc_rgb", inputs: { R: r, G: g, B: b } } };
+      }
+      return { block: ex(n, text) };
+    }
+    const minus1 = (n, text, d) => {
+      const k = numv(n);
+      if (k !== null) { made++; return { shadow: numBlock(k + d) }; }
+      made++;
+      return { block: { type: "math_arithmetic", fields: { OP: d < 0 ? "MINUS" : "ADD" }, inputs: { A: val(n, text, 0), B: { shadow: numBlock(1) } } } };
+    };
+
+    // ---- 文 → ブロック（null はブロックにしない＝消してよい行）
+    function stmt(node) {
+      const c = node.code;
+      if (/^(pass|global\s.*)$/.test(c)) { if (c.startsWith("global")) c.slice(6).split(",").forEach((v) => varId(v.trim())); return null; }
+      let m;
+      if ((m = /^for\s+([A-Za-z_]\w*)\s+in\s+(range\s*\(.*\))\s*:$/.exec(c))) {
+        const off = c.indexOf(m[2]), r = parseExpr(m[2]), text = c.slice(off), a = r.args;
+        if (!isFn(r, "range", a.length) || a.length < 1 || a.length > 3) throw new Error("range");
+        const DO = body(node.children);
+        made++;
+        if (a.length === 1 && /^(_|count\d*)$/.test(m[1]))
+          return { type: "controls_repeat_ext", inputs: { TIMES: val(a[0], text, 10), ...(DO ? { DO: { block: DO } } : {}) } };
+        const step = a.length === 3 ? numv(a[2]) : 1;
+        if (step === null || step === 0) throw new Error("step");
+        return {
+          type: "controls_for", fields: { VAR: { id: varId(m[1]) } },
+          inputs: {
+            FROM: a.length === 1 ? { shadow: numBlock(0) } : val(a[0], text, 0),
+            TO: minus1(a[a.length === 1 ? 0 : 1], text, step > 0 ? -1 : 1),
+            BY: { shadow: numBlock(Math.abs(step)) },
+            ...(DO ? { DO: { block: DO } } : {}),
+          },
+        };
+      }
+      if (/:$/.test(c)) throw new Error("block stmt");          // while / def / with など
+      const toks = tokenize(c);
+      if (toks.length >= 3 && toks[0].k === "name" && toks[1].k === "op" && ["=", "+=", "-=", "*=", "/="].includes(toks[1].v)) {
+        const name = toks[0].v, op = toks[1].v, text = c.slice(toks[2].s), e = parseExpr(text);
+        const id = varId(name);
+        made++;
+        // ブロックの「〜を増やす」が作る形 x = (x or 0) + d
+        if (op === "=" && e.t === "bin" && e.op === "+" && e.a.t === "paren" && e.a.x.t === "logic" && e.a.x.op === "or"
+            && e.a.x.a.t === "name" && e.a.x.a.v === name && numv(e.a.x.b) === 0)
+          return { type: "math_change", fields: { VAR: { id } }, inputs: { DELTA: val(e.b, text, 1) } };
+        if (op === "+=") return { type: "math_change", fields: { VAR: { id } }, inputs: { DELTA: val(e, text, 1) } };
+        if (op === "-=") {
+          const k = numv(e);
+          return { type: "math_change", fields: { VAR: { id } },
+            inputs: { DELTA: k !== null ? { shadow: numBlock(-k) } : { block: { type: "math_single", fields: { OP: "NEG" }, inputs: { NUM: val(e, text, 0) } }, shadow: numBlock(1) } } };
+        }
+        if (op === "=") return { type: "variables_set", fields: { VAR: { id } }, inputs: { VALUE: { block: ex(e, text) } } };
+        const bin = { t: "bin", op: op[0], a: { t: "name", v: name, s: 0, e: 0 }, b: e, s: 0, e: 0 };
+        return { type: "variables_set", fields: { VAR: { id } }, inputs: { VALUE: { block: ex(bin, text) } } };
+      }
+      const e = parseExpr(c), a = e.args || [];
+      if (isCall(e, "ring", "show") && !a.length) return null;     // ブロックは「まつ」とループの終わりで光らせる
+      if (isCall(e, "ring", "clear") && !a.length) { made++; return { type: "kc_ring_clear" }; }
+      if (isCall(e, "ring", "fill") && a.length === 1) { made++; return { type: "kc_ring_fill", inputs: { COLOR: colour(a[0], c) } }; }
+      if (isCall(e, "ring", "set") && a.length === 2) { made++; return { type: "kc_ring_set", inputs: { N: val(strip(a[0], "int"), c, 0), COLOR: colour(a[1], c) } }; }
+      if (isCall(e, "bar", "clear") && !a.length) { made++; return { type: "kc_bar_clear" }; }
+      if (isCall(e, "bar", "level") && a.length === 1) { made++; return { type: "kc_bar_level", inputs: { N: val(strip(a[0], "int"), c, 5) } }; }
+      if (isCall(e, "bar", "set") && (a.length === 1 || a.length === 2)) {
+        const k = a.length === 2 ? numv(a[1]) ?? (a[1].t === "name" ? { True: 255, False: 0 }[a[1].v] ?? null : null) : 255;
+        if (k === null) throw new Error("bar.set");
+        made++;
+        return { type: "kc_bar_set", fields: { ON: k > 0 ? "255" : "0" }, inputs: { N: val(strip(a[0], "int"), c, 0) } };
+      }
+      if (isCall(e, "time", "sleep") && a.length === 1) { made++; return { type: "kc_wait", inputs: { S: val(a[0], c, 1) } }; }
+      if (isCall(e, "time", "sleep_ms") && a.length === 1) {
+        made++;
+        const ms = a[0], k = numv(ms), inner = strip(ms, "int");
+        if (k !== null) return { type: "kc_wait", inputs: { S: { shadow: numBlock(Math.round(k) / 1000) } } };
+        if (inner !== ms && inner.t === "bin" && inner.op === "*" && numv(inner.b) === 1000) return { type: "kc_wait", inputs: { S: val(inner.a, c, 1) } };
+        return { type: "kc_wait", inputs: { S: { block: { type: "math_arithmetic", fields: { OP: "DIVIDE" }, inputs: { A: val(ms, c, 0), B: { shadow: numBlock(1000) } } } } } };
+      }
+      throw new Error("stmt");
+    }
+
+    // ---- 文の並び → つながったブロック（if / elif / else はひとまとめ）
+    function body(nodes) {
+      const out = [];
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (/^if\b.*:$/.test(node.code)) {
+          const group = [node];
+          while (nodes[i + 1] && nodes[i + 1].indent === node.indent && /^(elif\b.*|else\s*):$/.test(nodes[i + 1].code)) group.push(nodes[++i]);
+          const save = [made, raws, vars.size];
+          try {
+            const st = { type: "controls_if", inputs: {} };
+            let k = 0, hasElse = false;
+            for (const g of group) {
+              const DO = body(g.children);
+              if (/^else\s*:$/.test(g.code)) { hasElse = true; if (DO) st.inputs.ELSE = { block: DO }; continue; }
+              const cond = g.code.replace(/^(if|elif)\b/, "").replace(/:$/, "");
+              st.inputs["IF" + k] = { block: ex(parseExpr(cond.trim()), cond.trim()) };
+              if (DO) st.inputs["DO" + k] = { block: DO };
+              k++;
+            }
+            if (k > 1 || hasElse) st.extraState = { ...(k > 1 ? { elseIfCount: k - 1 } : {}), ...(hasElse ? { hasElse: true } : {}) };
+            made++;
+            out.push(st);
+          } catch (err) {
+            [made, raws] = save;
+            out.push(rawStmt(node.from, lastLine(group[group.length - 1]), node.indent));
+          }
+          continue;
+        }
+        const save = [made, raws];
+        try {
+          const b = stmt(node);
+          if (b) out.push(b);
+        } catch (err) {
+          [made, raws] = save;
+          out.push(rawStmt(node.from, lastLine(node), node.indent));
+        }
+      }
+      return chain(...out);
+    }
+
+    // ---- ファイル全体：setup / loop / それ以外 に分ける
+    let setupNodes = null, loopNodes = null, whileNodes = null;
+    const init = [], others = [], top = [];
+    const callOnly = (n) => /^(setup|loop)\(\)$/.test(n.code);
+    const walkTop = (nodes) => {
+      let m;
+      for (const n of nodes) {
+        const c = n.code;
+        if (/^(from\s+keychain\s+import\b|import\s+time\s*$)/.test(c) || callOnly(n)) continue;
+        if (/^def\s+setup\s*\(\s*\)\s*:$/.test(c)) { setupNodes = n.children; continue; }
+        if (/^def\s+loop\s*\(\s*\)\s*:$/.test(c)) { loopNodes = n.children; continue; }
+        if (/^def\s+(kc_wheel|kc_c)\s*\(/.test(c)) continue;          // ブロックが自分で作り直す
+        if (/^if\s+__name__\s*==/.test(c)) { walkTop(n.children); continue; }
+        if (/^while\s+(True|1)\s*:$/.test(c)) {
+          if (n.children.every((k) => callOnly(k) || /^(time\.sleep(_ms)?\(.*\)|ring\.show\(\))$/.test(k.code))) continue;
+          whileNodes = n.children; continue;
+        }
+        if (/^(import|from|def|class|@)\b/.test(c)) { top.push(n); continue; }
+        if ((m = /^([A-Za-z_]\w*)\s*=\s*None$/.exec(c))) { varId(m[1]); continue; }   // 変数を作るだけの行
+        if (/^[A-Za-z_]\w*\s*=[^=]/.test(c)) { init.push(n); continue; }
+        others.push(n);
+      }
+    };
+    walkTop(tree);
+    if (!loopNodes && whileNodes) loopNodes = whileNodes;
+    if (loopNodes) top.push(...others);
+    else init.push(...others);
+    if (!setupNodes && !loopNodes && !init.length) throw new Error("empty");
+
+    if (generated && loopNodes) {            // ブロックが最後に足す「光らせて少し待つ」は二重にしない
+      const L = loopNodes.slice();
+      if (L.length && /^time\.sleep_ms\(20\)$/.test(L[L.length - 1].code)) L.pop();
+      if (L.length && /^ring\.show\(\)$/.test(L[L.length - 1].code)) L.pop();
+      loopNodes = L;
+    }
+    const setupBlock = body([...init, ...(setupNodes || [])]);
+    const loopBlock = body(loopNodes || []);
+    // import random / math は、ブロックが使えば自動で足される。残った Python が使うときだけ残す
+    const topParts = top.map((n) => rawText(n.from, lastLine(n), n.indent));
+    const used = rawTexts.concat(topParts.filter((t) => !/^import\s+(random|math)\s*$/.test(t))).join("\n");
+    const topText = topParts.filter((t) => {
+      const m = /^import\s+(random|math)\s*$/.exec(t);
+      return !m || used.includes(m[1] + ".");
+    }).join("\n\n");
+
+    const blocks = [];
+    if (topText) { raws++; blocks.push({ type: "kc_py_top", x: 16, y: 0, fields: { CODE: topText } }); }
+    blocks.push({ type: "kc_setup", x: 16, y: 1000, ...(setupBlock ? { inputs: { DO: { block: setupBlock } } } : {}) });
+    blocks.push({ type: "kc_loop", x: 16, y: 2000, ...(loopBlock ? { inputs: { DO: { block: loopBlock } } } : {}) });
+    const variables = [...vars].map(([name, id]) => ({ name: legend[name] || name, id }));
+    return { state: { blocks: { languageVersion: 0, blocks }, variables }, made, raws };
+  }
+
+  return { convert };
+})();
+
+let undoState = null;
+function importPython(text, msgEl) {
+  const say = (t, cls) => { msgEl.textContent = t; msgEl.className = "status " + (cls || ""); };
+  if (!ws) { say("ブロックの部品が読み込めていないので、変換できません。", "err"); return false; }
+  if (!text.trim()) { say("Python が空です。", "err"); return false; }
+  let r;
+  try { r = PyToBlocks.convert(text); } catch (e) { say("ブロックにできませんでした。setup() と loop() のある形か確かめてください。", "err"); return false; }
+  const before = Blockly.serialization.workspaces.save(ws);
+  Blockly.Events.disable();
+  try {
+    Blockly.serialization.workspaces.load(r.state, ws);
+  } catch (e) {
+    Blockly.serialization.workspaces.load(before, ws);
+    Blockly.Events.enable();
+    say("ブロックにできませんでした（" + (e && e.message ? e.message : "不明") + "）。", "err");
+    return false;
+  }
+  Blockly.Events.enable();
+  ws.cleanUp();
+  undoState = before;
+  $("imp-undo").hidden = false;
+  bSample = null;
+  setMode("block");
+  showTopLeft();
+  store.set("kc_ws", JSON.stringify(Blockly.serialization.workspaces.save(ws)));
+  renderChips(); refreshGenerated();
+  say(r.raws
+    ? `ブロックにしました。灰色の「Pythonのまま」が ${r.raws} か所あります（そこは書いたとおりに動きます）。`
+    : "ぜんぶブロックにできました。", "ok");
+  return true;
+}
+
 // ================================================================ 画面
 function renderChips() {
   const make = (box, names, active, onPick) => {
@@ -603,6 +1164,37 @@ $("tab-text").onclick = () => setMode("text");
 $("to-text").onclick = () => {
   if (!generated) return;
   $("src").value = generated; store.set("kc_src", generated); tSample = null; renderChips(); setMode("text");
+};
+
+$("imp-prompt").textContent = AI_PROMPT;
+$("imp-open").onclick = () => {
+  const open = $("imp").hidden;
+  $("imp").hidden = !open;
+  $("imp-open").setAttribute("aria-expanded", String(open));
+  if (open) $("imp-src").focus();
+};
+$("imp-go").onclick = () => importPython($("imp-src").value, $("imp-msg"));
+$("text-to-block").onclick = () => {
+  if (importPython($("src").value, $("t2b-msg"))) { $("imp").hidden = false; $("imp-msg").textContent = $("t2b-msg").textContent; $("imp-msg").className = $("t2b-msg").className; $("t2b-msg").textContent = ""; }
+};
+$("imp-undo").onclick = () => {
+  if (!undoState || !ws) return;
+  Blockly.Events.disable();
+  try { Blockly.serialization.workspaces.load(undoState, ws); } finally { Blockly.Events.enable(); }
+  undoState = null; $("imp-undo").hidden = true;
+  showTopLeft();
+  store.set("kc_ws", JSON.stringify(Blockly.serialization.workspaces.save(ws)));
+  refreshGenerated();
+  $("imp-msg").textContent = "前のブロックにもどしました。"; $("imp-msg").className = "status";
+};
+$("imp-copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(AI_PROMPT); $("imp-msg").textContent = "お願い文をコピーしました。AIに貼りつけて、最後の【作ってほしいもの】を書きかえてください。"; $("imp-msg").className = "status ok"; }
+  catch (e) {
+    const d = $("imp").querySelector("details"); d.open = true;
+    const r = document.createRange(); r.selectNodeContents($("imp-prompt"));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    $("imp-msg").textContent = "自動でコピーできなかったので、文を選んでおきました。コピーしてください。"; $("imp-msg").className = "status";
+  }
 };
 
 const savedSrc = store.get("kc_src");
