@@ -35,7 +35,10 @@
   --pink: #ff5aa0; --pink-soft: #3d1f2e; --ok: #4cc58d; --warn: #ff8a66;
   --code-bg: #0f0b0e; --code-fg: #f3e9ef; --ws-bg: #1b1519; --flyout: #2b2229; color-scheme: dark }
 
-body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.65; }
+/* claude.ai の外枠が足している基本設定。自社サイトに置いたときも同じに動くよう、ここにも書く */
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.65; }
 .wrap { max-width: 760px; margin: 0 auto; padding-block: 24px 48px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: grid; gap: 20px; }
@@ -114,9 +117,9 @@ code { font-family: var(--f-code); font-size: .88em; }
 
   <section>
     <h2><span class="n">2</span>書き込みファイルを保存</h2>
-    <button class="go" id="save">keychain_program.txt を保存</button>
+    <button class="go" id="save">書き込みファイルを保存</button>
     <p class="status" id="status" role="status"></p>
-    <p class="note">中身は基板用の書き込みデータ（UF2形式）です。名前は .txt ですが、そのまま使えます。いま選んでいるタブ（ブロックかテキスト）のプログラムが入ります。</p>
+    <p class="note">keychain_program.uf2 という名前で保存されます（claude.ai で開いたときは keychain_program.txt。中身は同じで、そのまま使えます）。いま選んでいるタブ（ブロックかテキスト）のプログラムが入ります。</p>
   </section>
 
   <section>
@@ -124,7 +127,7 @@ code { font-family: var(--f-code); font-size: .88em; }
     <ol>
       <li>基板の <kbd>B</kbd> ボタンを押しながら、iPhoneにUSB-Cでつなぐ</li>
       <li>「ファイル」アプリを開くと <code>RPI-RP2</code> が出る</li>
-      <li>保存した <code>keychain_program.txt</code> を長押し →「コピー」→ <code>RPI-RP2</code> の中で長押し →「ペースト」</li>
+      <li>保存した <code>keychain_program.uf2</code> を長押し →「コピー」→ <code>RPI-RP2</code> の中で長押し →「ペースト」</li>
       <li>RPI-RP2 が消えて基板が動き出したら完了。<kbd>A</kbd> を何回か押して「マイアプリ」（水色）に切り替える</li>
     </ol>
     <p class="note">保存のときに保存先を選べる場合は、直接 RPI-RP2 を選んでもかまいません。プログラムにまちがいがあると、マイアプリで赤が3回点滅します。</p>
