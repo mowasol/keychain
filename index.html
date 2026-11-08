@@ -71,6 +71,7 @@ pre { margin: 8px 0 0; background: var(--code-bg); color: var(--code-fg); font-f
 .doclink small { color: var(--sub); font-size: .82rem; }
 .doclink-tag { flex: none; font-family: var(--f-display); font-weight: 800; font-size: .8rem; color: #fff; background: var(--pink);
   border-radius: 6px; padding: 4px 7px; }
+.chip, .ghost { min-height: 44px; }      /* 指で押しやすい大きさ（44px 以上） */
 .imp { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; min-width: 0; }
 .imp textarea { min-height: 180px; }
 .ghost.primary { background: var(--pink-soft); border-color: var(--pink); font-weight: 700; }
@@ -1049,7 +1050,7 @@ const PyToBlocks = (() => {
 
     // ---- ファイル全体：setup / loop / それ以外 に分ける
     let setupNodes = null, loopNodes = null, whileNodes = null;
-    const init = [], others = [], top = [];
+    const pre = [], top = [];                // pre：一番上に書かれた文（書かれた順）
     const callOnly = (n) => /^(setup|loop)\(\)$/.test(n.code);
     const walkTop = (nodes) => {
       let m;
@@ -1066,14 +1067,15 @@ const PyToBlocks = (() => {
         }
         if (/^(import|from|def|class|@)\b/.test(c)) { top.push(n); continue; }
         if ((m = /^([A-Za-z_]\w*)\s*=\s*None$/.exec(c))) { varId(m[1]); continue; }   // 変数を作るだけの行
-        if (/^[A-Za-z_]\w*\s*=[^=]/.test(c)) { init.push(n); continue; }
-        others.push(n);
+        pre.push({ n, assign: /^[A-Za-z_]\w*\s*=[^=]/.test(c) });
       }
     };
     walkTop(tree);
-    if (!loopNodes && whileNodes) loopNodes = whileNodes;
-    if (loopNodes) top.push(...others);
-    else init.push(...others);
+    // def loop() があるとき：一番上の「x = …」は「はじめに」へ、それ以外の文は setup より前に動く「じゅんび」へ。
+    // def loop() が無く while True: で書いたとき：while より前の文はすべて書いた順に「はじめに」へ
+    let init;
+    if (loopNodes) { init = pre.filter((p) => p.assign).map((p) => p.n); top.push(...pre.filter((p) => !p.assign).map((p) => p.n)); }
+    else { init = pre.map((p) => p.n); loopNodes = whileNodes; }
     if (!setupNodes && !loopNodes && !init.length) throw new Error("empty");
 
     if (generated && loopNodes) {            // ブロックが最後に足す「光らせて少し待つ」は二重にしない
