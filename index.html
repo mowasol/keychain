@@ -64,6 +64,13 @@ details { font-size: .9rem; }
 summary { cursor: pointer; color: var(--sub); }
 pre { margin: 8px 0 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--f-code); font-size: 12px; line-height: 1.55; padding: 12px; border-radius: 10px; overflow-x: auto; max-height: 320px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.doclink { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--panel); color: var(--ink); text-decoration: none; line-height: 1.4; min-height: 44px; }
+.doclink:hover { border-color: var(--pink); }
+.doclink:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+.doclink small { color: var(--sub); font-size: .82rem; }
+.doclink-tag { flex: none; font-family: var(--f-display); font-weight: 800; font-size: .8rem; color: #fff; background: var(--pink);
+  border-radius: 6px; padding: 4px 7px; }
 .imp { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; min-width: 0; }
 .imp textarea { min-height: 180px; }
 .ghost.primary { background: var(--pink-soft); border-color: var(--pink); font-weight: 700; }
@@ -91,6 +98,10 @@ code { font-family: var(--f-code); font-size: .88em; }
       <p>ルーレット基板の「マイアプリ」に、自分のプログラムを入れる</p>
     </div>
   </header>
+  <a class="doclink" id="guide-pdf" href="https://keychain.mowasol.com/keychain_guide_kids.pdf" target="_blank" rel="noopener">
+    <span class="doclink-tag">PDF</span>
+    <span><b>つかいかたの本（こども向け）</b><br><small>はじめての人は ここから。ひらいて ほぞん・いんさつ できます</small></span>
+  </a>
 
   <section>
     <h2><span class="n">1</span>プログラムを作る</h2>
