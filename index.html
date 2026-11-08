@@ -1071,7 +1071,14 @@ const PyToBlocks = (() => {
       if (L.length && /^ring\.show\(\)$/.test(L[L.length - 1].code)) L.pop();
       loopNodes = L;
     }
-    const setupBlock = body([...init, ...(setupNodes || [])]);
+    // 一番上の「x = 0」と setup() の中の「x = …」が両方あるときは、setup() のほうだけ使う（二重にしない）
+    const setInSetup = new Set((setupNodes || []).map((n) => (/^([A-Za-z_]\w*)\s*=[^=]/.exec(n.code) || [])[1]).filter(Boolean));
+    const firstInit = init.filter((n) => {
+      const m = /^([A-Za-z_]\w*)\s*=[^=]/.exec(n.code);
+      if (m && setInSetup.has(m[1])) { varId(m[1]); return false; }
+      return true;
+    });
+    const setupBlock = body([...firstInit, ...(setupNodes || [])]);
     const loopBlock = body(loopNodes || []);
     // import random / math は、ブロックが使えば自動で足される。残った Python が使うときだけ残す
     const topParts = top.map((n) => rawText(n.from, lastLine(n), n.indent));
