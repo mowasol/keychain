@@ -22,6 +22,11 @@
   --code-fg: #f3e9ef;
   --ws-bg: #fbf8fa;
   --flyout: #efe7ec;
+  --ok-soft: #e3f4ec;
+  --warn-soft: #fbe7e1;
+  --caution: #8a5f00;
+  --caution-soft: #fbf0d6;
+  --gut: #8c7a86; --gut-line: #3d323a; --gut-err: #ff7a6b; --gut-warn: #ffc34d;   /* 行番号（コード欄はどちらのテーマでも暗い） */
   --f-display: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
   --f-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", sans-serif;
   --f-code: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
@@ -29,11 +34,13 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #161115; --panel: #221a20; --ink: #f2e8ee; --sub: #b3a3ad; --line: #3a2f37;
   --pink: #ff5aa0; --pink-soft: #3d1f2e; --ok: #4cc58d; --warn: #ff8a66;
-  --code-bg: #0f0b0e; --code-fg: #f3e9ef; --ws-bg: #1b1519; --flyout: #2b2229; color-scheme: dark } }
+  --code-bg: #0f0b0e; --code-fg: #f3e9ef; --ws-bg: #1b1519; --flyout: #2b2229;
+  --ok-soft: #173326; --warn-soft: #3a211b; --caution: #ffc34d; --caution-soft: #3a2f14; color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #161115; --panel: #221a20; --ink: #f2e8ee; --sub: #b3a3ad; --line: #3a2f37;
   --pink: #ff5aa0; --pink-soft: #3d1f2e; --ok: #4cc58d; --warn: #ff8a66;
-  --code-bg: #0f0b0e; --code-fg: #f3e9ef; --ws-bg: #1b1519; --flyout: #2b2229; color-scheme: dark }
+  --code-bg: #0f0b0e; --code-fg: #f3e9ef; --ws-bg: #1b1519; --flyout: #2b2229;
+  --ok-soft: #173326; --warn-soft: #3a211b; --caution: #ffc34d; --caution-soft: #3a2f14; color-scheme: dark }
 
 /* claude.ai の外枠が足している基本設定。自社サイトに置いたときも同じに動くよう、ここにも書く */
 [hidden] { display: none !important; }
@@ -89,6 +96,39 @@ ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
 kbd { font-family: var(--f-code); font-size: .85em; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
 .note { font-size: .82rem; color: var(--sub); margin: 0; }
 code { font-family: var(--f-code); font-size: .88em; }
+
+/* 道具ボタン（もどす・消す・ズームなど） */
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tool { font: inherit; font-size: .84rem; min-height: 40px; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.tool:disabled { opacity: .4; cursor: default; }
+.tool.danger { color: var(--warn); }
+.tool .ic { font-family: var(--f-code); font-weight: 600; font-size: .95rem; }
+.tool-gap { flex: 1; }
+.tool:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+/* 行番号つきのコード欄 */
+.editor { display: grid; grid-template-columns: auto minmax(0, 1fr); background: var(--code-bg); border-radius: 10px; overflow: hidden; }
+.editor textarea { border-radius: 0; white-space: pre; overflow-wrap: normal; overflow-x: auto; padding-left: 8px; }
+.gutter { margin: 0; padding: 12px 6px 30px 10px; max-height: none; border-radius: 0; background: transparent; color: var(--gut);
+  border-right: 1px solid var(--gut-line); text-align: right; overflow: hidden; user-select: none; -webkit-user-select: none;
+  font-family: var(--f-code); font-size: 13px; line-height: 1.55; min-width: 2.2em; }
+.gutter span { display: block; }
+.gutter .e { color: var(--gut-err); font-weight: 600; }
+.gutter .w { color: var(--gut-warn); }
+/* コードチェックの結果 */
+.check { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.check-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .9rem; }
+.check-head b { font-family: var(--f-display); font-weight: 800; }
+.badge { font-weight: 700; border-radius: 999px; padding: 2px 10px; font-size: .82rem; }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.err { background: var(--warn-soft); color: var(--warn); }
+.badge.warn { background: var(--caution-soft); color: var(--caution); }
+.chk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.chk-item { font: inherit; font-size: .86rem; line-height: 1.5; width: 100%; text-align: left; background: var(--bg); color: var(--ink);
+  border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 6px; padding: 6px 10px; cursor: pointer; min-height: 36px; }
+.chk-item.warn { border-left-color: var(--caution); }
+.chk-item b { font-variant-numeric: tabular-nums; margin-right: 6px; }
+.chk-item:focus-visible { outline: 3px solid var(--pink); outline-offset: 1px; }
 </style>
 
 <div class="wrap">
@@ -113,6 +153,16 @@ code { font-family: var(--f-code); font-size: .88em; }
 
     <div class="pane" id="pane-block">
       <div class="samples" id="bsamples"></div>
+      <div class="toolbar" id="btools" aria-label="ブロックの道具">
+        <button class="tool" id="b-undo" type="button" title="1つ前にもどす（Ctrl+Z）"><span class="ic">↶</span>もどす</button>
+        <button class="tool" id="b-redo" type="button" title="もどしたのをやりなおす（Ctrl+Y）"><span class="ic">↷</span>やりなおす</button>
+        <button class="tool" id="b-tidy" type="button" title="ブロックを左にきれいに並べる">並べる</button>
+        <span class="tool-gap"></span>
+        <button class="tool" id="b-zin" type="button" aria-label="大きくする"><span class="ic">＋</span></button>
+        <button class="tool" id="b-zout" type="button" aria-label="小さくする"><span class="ic">－</span></button>
+        <button class="tool" id="b-fit" type="button" title="ぜんぶが見える大きさにする">全体</button>
+        <button class="tool danger" id="b-clear" type="button" title="「はじめに」「ずっと くりかえす」だけにする">ぜんぶ消す</button>
+      </div>
       <div id="blockly"></div>
       <p class="note">左の分類からブロックを引き出して「はじめに」「ずっと くりかえす」の中にはめます。いらないブロックは左の分類の上へドラッグすると消えます。リングは0番が12時で、時計回りに11番まで。</p>
       <details>
@@ -141,10 +191,22 @@ code { font-family: var(--f-code); font-size: .88em; }
 
     <div class="pane" id="pane-text" hidden>
       <div class="samples" id="tsamples"></div>
-      <textarea id="src" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="プログラム"></textarea>
-      <div class="meta"><span>setup() は最初に1回、loop() はずっと繰り返し</span></div>
+      <div class="toolbar" aria-label="テキストの道具">
+        <button class="tool" id="t-undo" type="button" hidden><span class="ic">↶</span>前のテキストにもどす</button>
+        <span class="tool-gap"></span>
+        <button class="tool danger" id="t-clear" type="button" title="ひな形（setup と loop）だけにする">ぜんぶ消す</button>
+      </div>
+      <div class="editor">
+        <pre class="gutter" id="gut" aria-hidden="true"></pre>
+        <textarea id="src" wrap="off" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="プログラム"></textarea>
+      </div>
+      <div class="meta"><span>setup() は最初に1回、loop() はずっと繰り返し</span><span><kbd>Tab</kbd> 字下げ・<kbd>Shift</kbd>+<kbd>Tab</kbd> もどす・<kbd>Ctrl</kbd>+<kbd>/</kbd> コメント</span></div>
       <div class="row"><button class="ghost" id="text-to-block" type="button">このプログラムをブロックにする</button></div>
       <p class="status" id="t2b-msg" role="status"></p>
+    </div>
+    <div class="check" id="check">
+      <div class="check-head"><b>コードチェック</b><span class="badge" id="chk-badge"></span><span class="note" id="chk-note"></span></div>
+      <ul class="chk-list" id="chk-list"></ul>
     </div>
     <div class="meta"><span id="size"></span><span id="modeinfo"></span></div>
   </section>
@@ -548,7 +610,18 @@ function refreshGenerated() {
   if (!ws) return;
   try { generated = blocksToPython(); } catch (e) { generated = ""; }
   $("gen").textContent = generated;
-  updateSize();
+  updateSize(); updateUndoButtons();
+  if (mode === "block") scheduleCheck(0);
+}
+// ブロックを動かすたびに Python を作り直すと重いので、手を止めて 0.15 秒たってからまとめて1回やる
+let blockTimer = 0;
+function scheduleBlockSave() {
+  clearTimeout(blockTimer);
+  blockTimer = setTimeout(() => {
+    if (ws.isDragging()) { scheduleBlockSave(); return; }
+    store.set("kc_ws", JSON.stringify(Blockly.serialization.workspaces.save(ws)));
+    refreshGenerated();
+  }, 150);
 }
 
 function showTopLeft() {                    // ブロックの左上が画面の左上に来るように
@@ -560,6 +633,7 @@ function loadBlockSample(name) {
   bSample = name;
   Blockly.Events.disable();
   try { Blockly.serialization.workspaces.load(toState(BSAMPLES[name]), ws); } finally { Blockly.Events.enable(); }
+  ws.clearUndo();                            // 読みこむ前の「もどす」は使えなくなるので消しておく
   showTopLeft();
   store.set("kc_ws", JSON.stringify(Blockly.serialization.workspaces.save(ws)));
   renderChips(); refreshGenerated();
@@ -601,14 +675,406 @@ function initBlockly() {
   ws.addChangeListener((e) => {
     if (e.isUiEvent) return;
     if (!ws.getTopBlocks().some((b) => b.type === "kc_loop") && !ws.isDragging()) { loadBlockSample(bSample || "青の追いかけっこ"); return; }
-    store.set("kc_ws", JSON.stringify(Blockly.serialization.workspaces.save(ws)));
     if (bSample && e.type !== Blockly.Events.FINISHED_LOADING) { bSample = null; renderChips(); }
-    refreshGenerated();
+    scheduleBlockSave();
   });
+  ws.addChangeListener(() => updateUndoButtons());
+  updateUndoButtons();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => ws.setTheme(makeTheme()));
   new MutationObserver(() => ws.setTheme(makeTheme())).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   refreshGenerated();
 }
+
+// ==== PyCheck begin
+// ================================================================ コードチェック
+// 基板に書き込む前に、ブラウザの中だけで Python をざっと調べる（Python は動かさない）。
+// まちがい（err）＝ 基板で必ずエラーになるもの。注意（warn）＝ 動くが思ったとおりにならないかもしれないもの。
+const PyCheck = (() => {
+  const KW = new Set(("False None True and as assert async await break class continue def del elif else except finally for from " +
+    "global if import in is lambda nonlocal not or pass raise return try while with yield").split(" "));
+  const BUILTINS = new Set(("abs all any bin bool bytearray bytes callable chr classmethod dict dir divmod enumerate eval exec filter float " +
+    "getattr globals hasattr hash hex id input int isinstance issubclass iter len list locals map max memoryview min next object oct open " +
+    "ord pow print property range repr reversed round set setattr slice sorted staticmethod str sum super tuple type zip __name__ __import__ " +
+    "BaseException Exception ArithmeticError AssertionError AttributeError ImportError IndexError KeyError KeyboardInterrupt LookupError " +
+    "MemoryError NameError NotImplementedError OSError OverflowError RuntimeError StopIteration SystemExit TypeError ValueError ZeroDivisionError").split(" "));
+  const MODULES = new Set(("keychain time utime random urandom math machine neopixel micropython gc sys struct ustruct array rp2 os uos " +
+    "binascii ubinascii collections ucollections json ujson re ure framebuf select io uio errno asyncio uasyncio").split(" "));
+  const NOT_HERE = { board: "CircuitPython 用", digitalio: "CircuitPython 用", busio: "CircuitPython 用", adafruit_pixelbuf: "CircuitPython 用",
+    RPi: "ラズパイ（パソコン）用", numpy: "パソコン用", pygame: "パソコン用", tkinter: "パソコン用", turtle: "パソコン用",
+    requests: "パソコン用", threading: "パソコン用", serial: "パソコン用", keyboard: "パソコン用" };
+  const KC_EXPORTS = new Set("ring bar sensor led button_a button_b usb_connected_to_pc i2c Ring Bar Sensors".split(" "));
+  // 名前.関数 → [引数の最小, 最大]。null は値（かっこを付けない）
+  const API = {
+    ring: { set: [2, 2], fill: [1, 1], clear: [0, 0], show: [0, 0], COUNT: null, MAX_BRIGHTNESS: null },
+    bar: { set: [1, 2], level: [1, 2], clear: [0, 0], pulse: [1, 1], COUNT: null, MAX_BRIGHTNESS: null },
+    sensor: { acceleration: [0, 0], strength: [0, 0], shaken: [0, 1], tapped: [0, 1], temperature: [0, 0], humidity: [0, 0] },
+    time: { sleep: [1, 1], sleep_ms: [1, 1], sleep_us: [1, 1], ticks_ms: [0, 0], ticks_us: [0, 0], ticks_cpu: [0, 0], ticks_diff: [2, 2],
+      ticks_add: [2, 2], time: [0, 0], time_ns: [0, 0], localtime: [0, 1], gmtime: [0, 1], mktime: [1, 1] },
+    random: { randint: [2, 2], random: [0, 0], choice: [1, 1], uniform: [2, 2], randrange: [1, 3], getrandbits: [1, 1], seed: [0, 1] },
+  };
+  const CANON = { utime: "time", urandom: "random" };
+  const OPS = ["**=", "//=", ">>=", "<<=", "->", ":=", "**", "//", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=",
+    "<<", ">>", "+", "-", "*", "/", "%", "<", ">", "=", "(", ")", "[", "]", "{", "}", ",", ":", ".", ";", "@", "&", "|", "^", "~"];
+  const PAIR = { ")": "(", "]": "[", "}": "{" };
+  const ZEN = { "、": ",", "。": ".", "“": '"', "”": '"', "‘": "'", "’": "'", "「": '"', "」": '"', "　": " ", "・": "." };
+  const isZen = (c) => (c >= "！" && c <= "～") || c in ZEN;
+  const half = (c) => ZEN[c] || String.fromCharCode(c.charCodeAt(0) - 0xFEE0);
+  const isIdStart = (c) => /[A-Za-z_]/.test(c) || (c > "\x7f" && !isZen(c));
+  const isId = (c) => /[A-Za-z0-9_]/.test(c) || (c > "\x7f" && !isZen(c));
+  const AUG = new Set(["+=", "-=", "*=", "/=", "//=", "%=", "**=", "&=", "|=", "^=", ">>=", "<<="]);
+  const HEADS = new Set(["if", "elif", "else", "for", "while", "def", "class", "try", "except", "finally", "with"]);
+
+  function dist(a, b) {                       // つづりの近さ（レーベンシュタイン距離）
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++)
+      for (let j = 1; j <= b.length; j++)
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  }
+  function nearest(w, cands) {
+    if (w.length > 30) return null;
+    let best = null, bd = 3;
+    for (const c of cands) { const x = dist(w.toLowerCase(), c.toLowerCase()); if (x < bd && x <= Math.max(1, Math.floor(w.length / 3))) { bd = x; best = c; } }
+    return best;
+  }
+
+  // ---- 字（トークン）と論理行に分ける。かっこの中の改行・\ の改行は1行につなぐ
+  function scan(src, out) {
+    const lines = [], stack = [];
+    let i = 0, ln = 1, cur = null, atStart = true;
+    const add = (line, level, msg, syntax = true) => out.push({ line, level, msg, syntax });
+    while (i <= src.length) {
+      const c = src[i];
+      if (atStart) {                          // 行の頭：字下げを数える
+        let j = i, w = 0, tab = false, sp = false, zen = false;
+        while (src[j] === " " || src[j] === "\t" || src[j] === "　") {
+          if (src[j] === "\t") { tab = true; w = (Math.floor(w / 8) + 1) * 8; } else if (src[j] === " ") { sp = true; w++; } else { zen = true; w += 2; }
+          j++;
+        }
+        const e = src[j];
+        if (e === undefined || e === "\n" || e === "\r" || e === "#") { // 空行・コメントだけの行
+          while (j < src.length && src[j] !== "\n") j++;
+          if (j >= src.length) break;
+          i = j + 1; ln++; continue;
+        }
+        if (zen) add(ln, "err", "行の頭に全角スペースがあります。字下げは半角スペースにしてください");
+        cur = { line: ln, indent: w, tab, sp, toks: [] };
+        lines.push(cur);
+        atStart = false; i = j; continue;
+      }
+      if (c === undefined) break;
+      if (c === "\n") {
+        ln++; i++;
+        if (stack.length === 0) atStart = true;
+        continue;
+      }
+      if (c === "\r" || c === " " || c === "\t" || c === "\f") { i++; continue; }
+      if (c === "#") { while (i < src.length && src[i] !== "\n") i++; continue; }
+      if (c === "\\" && (src[i + 1] === "\n" || (src[i + 1] === "\r" && src[i + 2] === "\n"))) { i += src[i + 1] === "\r" ? 3 : 2; ln++; continue; }
+      const tk = (t, v) => cur.toks.push({ t, v, line: ln, depth: stack.length });
+      // 文字列（前に r b f u が付いてもよい）
+      const pm = /^([rRbBfFuU]{0,2})(['"])/.exec(src.slice(i, i + 3));
+      if (pm && (pm[1] === "" || !isId(src[i - 1] || " "))) {
+        const q = pm[2], start = ln, raw = /r/i.test(pm[1]);
+        let j = i + pm[1].length;
+        const triple = src.substr(j, 3) === q.repeat(3);
+        j += triple ? 3 : 1;
+        let ok = false;
+        while (j < src.length) {
+          const d = src[j];
+          if (d === "\\" && !raw) { if (src[j + 1] === "\n") ln++; j += 2; continue; }
+          if (d === "\\" && raw) { j += 2; continue; }
+          if (triple ? src.substr(j, 3) === q.repeat(3) : d === q) { j += triple ? 3 : 1; ok = true; break; }
+          if (d === "\n") { if (!triple) break; ln++; }
+          j++;
+        }
+        if (!ok) add(start, "err", triple ? `「${q.repeat(3)}」で始めた文字列が閉じていません` : `文字列の「${q}」が閉じていません（同じ行の中で ${q} を2つ書きます）`);
+        tk("str", src.slice(i, j));
+        i = j; continue;
+      }
+      if (/[0-9]/.test(c) || (c === "." && /[0-9]/.test(src[i + 1] || ""))) {
+        const m = /^(0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|(\d[\d_]*)?\.?\d*([eE][+-]?\d+)?j?)/.exec(src.slice(i));
+        tk("num", m[0]); i += m[0].length;
+        if (isIdStart(src[i] || " ")) { add(ln, "err", `数のすぐあとに文字「${src[i]}」があります（「${m[0]}${src[i]}」）。かけ算なら * を書きます`); }
+        continue;
+      }
+      if (isIdStart(c)) {
+        let j = i + 1; while (j < src.length && isId(src[j])) j++;
+        tk("name", src.slice(i, j)); i = j; continue;
+      }
+      if (isZen(c)) {
+        add(ln, "err", c === "　" ? "全角スペースがあります。半角スペースにしてください" : `全角の「${c}」があります。半角の「${half(c)}」にしてください`);
+        i++; continue;
+      }
+      const op = OPS.find((o) => src.startsWith(o, i));
+      if (op) {
+        if ("([{".includes(op)) { tk("op", op); stack.push({ op, line: ln }); }
+        else if (")]}".includes(op)) {
+          const top = stack[stack.length - 1];
+          if (!top) add(ln, "err", `閉じかっこ「${op}」が多すぎます`);
+          else if (top.op !== PAIR[op]) add(ln, "err", `かっこの組み合わせがちがいます（${top.line}行目の「${top.op}」を「${op}」で閉じています）`);
+          if (top) stack.pop();
+          tk("op", op);
+        } else tk("op", op);
+        i += op.length; continue;
+      }
+      add(ln, "err", c === "!" ? "「!」だけでは使えません。「ではない」は != か not を使います" : `Python では使えない字「${c}」があります`);
+      i++;
+    }
+    for (const s of stack) add(s.line, "err", `かっこ「${s.op}」が閉じていません`);
+    return lines;
+  }
+
+  function check(src) {
+    const out = [];
+    const lines = scan(src.replace(/\r\n?/g, "\n"), out);
+    const add = (line, level, msg, syntax = false) => out.push({ line, level, msg, syntax });
+
+    // ---- 字下げと「:」
+    if (lines.some((l) => l.tab) && lines.some((l) => l.sp)) {
+      const l = lines.find((x) => x.tab);
+      add(l.line, "err", "字下げにタブと半角スペースがまざっています。スペース4つにそろえてください", true);
+    }
+    const stack = [0], lastHead = {};
+    let prev = null;
+    for (const L of lines) {
+      const t = L.toks, first = t[0], last = t[t.length - 1];
+      const top = stack[stack.length - 1];
+      // 「:」を書きわすれた if や def も、ブロックが始まったことにする（下の行まで全部まちがいにしない）
+      const opened = prev && ((prev.toks[prev.toks.length - 1].v === ":" && prev.toks[prev.toks.length - 1].depth === 0) || prev.noColon);
+      if (opened) {
+        if (L.indent <= top) add(L.line, "err", `${prev.line}行目が「:」で終わっているので、この行は字下げ（スペース4つ）が必要です`, true);
+        else stack.push(L.indent);
+      } else if (L.indent > top) {
+        add(L.line, "err", "字下げが多すぎます（上の行と頭をそろえてください）", true);
+        stack.push(L.indent);                 // 次の行からは、この字下げを基準にする（まちがいを1か所にとどめる）
+      } else if (L.indent < top) {
+        while (stack.length > 1 && stack[stack.length - 1] > L.indent) stack.pop();
+        if (stack[stack.length - 1] !== L.indent) add(L.line, "err", "字下げの位置が、上のどの行ともそろっていません", true);
+      }
+      const ind = stack[stack.length - 1];
+      for (const k of Object.keys(lastHead)) if (+k > ind) delete lastHead[k];
+      const kw = first && first.t === "name" ? first.v : "";
+      if (HEADS.has(kw)) {
+        if (!t.some((x) => x.v === ":" && x.depth === 0 && x.t === "op")) {
+          add(L.line, "err", `「${kw}」の行の最後に「:」（半角のコロン）がありません`, true);
+          L.noColon = true;
+        }
+        if ((kw === "if" || kw === "elif" || kw === "while")) {
+          const eq = t.find((x) => x.v === "=" && x.depth === 0);
+          if (eq) add(L.line, "err", "くらべるときは「=」ではなく「==」を使います", true);
+        }
+        const before = lastHead[ind];
+        if (kw === "elif" && !["if", "elif"].includes(before)) add(L.line, "err", "「elif」の前に、同じ字下げの if がありません", true);
+        if (kw === "else" && !["if", "elif", "for", "while", "try", "except"].includes(before)) add(L.line, "err", "「else」の前に、同じ字下げの if がありません", true);
+        if ((kw === "except" || kw === "finally") && !["try", "except", "else"].includes(before)) add(L.line, "err", `「${kw}」の前に try がありません`, true);
+      }
+      lastHead[ind] = kw;
+      prev = L;
+    }
+    if (prev && prev.toks.length && prev.toks[prev.toks.length - 1].v === ":" && prev.toks[prev.toks.length - 1].depth === 0)
+      add(prev.line, "err", "「:」のあとに中身がありません（字下げして書くか、pass と書きます）", true);
+
+    // ---- 名前を集める
+    const globalsDef = new Set(), alias = {}, extra = new Set();
+    let star = false;
+    const scopes = [];                      // 一番外の def ごと：{name, line, indent, params, assigned, aug, globals, lines}
+    let scope = null;
+    const targetsOf = (t) => {             // 「a, b = …」「a += …」の左がわの名前
+      const names = [], eq = t.findIndex((x) => x.depth === 0 && (x.v === "=" || AUG.has(x.v)));
+      if (eq < 0) return { names, aug: false };
+      if (t.slice(0, eq).every((x) => x.t === "name" || x.v === "," || x.v === "(" || x.v === ")"))
+        t.slice(0, eq).forEach((x) => x.t === "name" && names.push(x.v));
+      // a = b = 0
+      for (let k = eq + 1; k < t.length; k++) if (t[k].v === "=" && t[k].depth === 0 && t[k - 1].t === "name" && (k === eq + 2)) names.push(t[k - 1].v);
+      return { names, aug: AUG.has(t[eq].v) };
+    };
+    for (const L of lines) {
+      const t = L.toks, kw = t[0].t === "name" ? t[0].v : "";
+      if (scope && L.indent <= scope.indent) scope = null;
+      const bag = scope ? scope.assigned : globalsDef;
+      // 内包表記・lambda・with/except の as・:= の名前はどこでも作られたことにする
+      t.forEach((x, k) => {
+        if (x.v === "for" && k > 0) for (let m = k + 1; m < t.length && t[m].v !== "in"; m++) if (t[m].t === "name") extra.add(t[m].v);
+        if (x.v === "lambda") for (let m = k + 1; m < t.length && t[m].v !== ":"; m++) if (t[m].t === "name") extra.add(t[m].v);
+        if (x.v === "as" && t[k + 1] && t[k + 1].t === "name") bag.add(t[k + 1].v);
+        if (x.v === ":=" && k > 0) bag.add(t[k - 1].v);
+      });
+      if (kw === "import") {
+        for (let k = 1; k < t.length; k++) {
+          if (t[k].t !== "name" || (t[k - 1].v !== "import" && t[k - 1].v !== ",")) continue;
+          const mod = t[k].v;
+          let m = k; while (t[m + 1] && t[m + 1].v === "." && t[m + 2]) m += 2;
+          const as = t[m + 1] && t[m + 1].v === "as" ? t[m + 2].v : mod;
+          checkModule(mod, L.line);
+          bag.add(as); alias[as] = CANON[mod] || mod;
+        }
+      } else if (kw === "from" && t[1]) {
+        const mod = t[1].v;
+        checkModule(mod, L.line);
+        const ii = t.findIndex((x) => x.v === "import");
+        for (let k = ii + 1; k > 0 && k < t.length; k++) {
+          if (t[k].v === "*") { star = true; continue; }
+          if (t[k].t !== "name" || t[k].v === "as" || t[k - 1].v === "as") continue;
+          const as = t[k + 1] && t[k + 1].v === "as" ? t[k + 2].v : t[k].v;
+          if (mod === "keychain" && !KC_EXPORTS.has(t[k].v)) {
+            const n = nearest(t[k].v, KC_EXPORTS);
+            add(L.line, "err", `keychain に「${t[k].v}」はありません${n ? `。「${n}」のこと？` : "（使えるのは ring, bar, sensor, led, button_a, button_b）"}`);
+          }
+          bag.add(as);
+          if (mod === "keychain" && API[t[k].v]) alias[as] = t[k].v;
+          if (mod === "time" || mod === "utime") alias[as] = "time." + t[k].v;
+        }
+      } else if (kw === "def" || kw === "class") {
+        const nm = t[1] && t[1].t === "name" ? t[1].v : null;
+        if (nm) bag.add(nm);
+        if (kw === "def" && !scope && nm) {
+          const params = new Set();
+          for (let k = 3; k < t.length && !(t[k].v === ")" && t[k].depth === 0); k++)
+            if (t[k].t === "name" && t[k].depth === 1 && ["(", ",", "*", "**"].includes(t[k - 1].v)) params.add(t[k].v);
+          scope = { name: nm, line: L.line, indent: L.indent, params, assigned: new Set(), aug: new Map(), plain: new Map(), globals: new Set(), lines: [] };
+          scopes.push(scope);
+          scope.lines.push(L);
+          continue;
+        }
+      } else if (kw === "global" || kw === "nonlocal") {
+        t.slice(1).forEach((x) => { if (x.t === "name") (scope ? scope.globals : globalsDef).add(x.v); if (!scope && x.t === "name") globalsDef.add(x.v); });
+      } else if (kw === "for") {
+        for (let k = 1; k < t.length && t[k].v !== "in"; k++) if (t[k].t === "name") bag.add(t[k].v);
+      }
+      if (scope) scope.lines.push(L);
+      const tg = targetsOf(t);
+      tg.names.forEach((n) => {
+        bag.add(n);
+        if (scope) { const map = tg.aug ? scope.aug : scope.plain; if (!map.has(n)) map.set(n, L.line); }
+      });
+    }
+
+    function checkModule(mod, line) {
+      if (NOT_HERE[mod]) add(line, "err", `「${mod}」は${NOT_HERE[mod]}で、この基板にはありません。光らせるのは from keychain import ring を使います`);
+      else if (!MODULES.has(mod)) add(line, "warn", `「${mod}」は、この基板に入っていないかもしれません`);
+    }
+
+    // ---- 作られていない名前・API のつづり・引数の数
+    const known = new Set([...globalsDef, ...extra, ...BUILTINS]);
+    const reported = new Set();
+    for (const L of lines) {
+      const t = L.toks;
+      const sc = scopes.find((s) => s.lines.includes(L));
+      if (t[0].v === "import" || t[0].v === "from" || t[0].v === "global" || t[0].v === "nonlocal") continue;
+      for (let k = 0; k < t.length; k++) {
+        const x = t[k];
+        if (x.t !== "name" || KW.has(x.v)) continue;
+        if (k > 0 && t[k - 1].v === ".") continue;
+        if (t[k + 1] && t[k + 1].v === "=" && x.depth > 0) continue;   // f(名前=値)
+        if (t[0].v === "def" && k <= 1) continue;
+        if (!star && !known.has(x.v) && !(sc && (sc.params.has(x.v) || sc.assigned.has(x.v))) && !reported.has(x.v)) {
+          reported.add(x.v);
+          const nm = x.v.length > 24 ? x.v.slice(0, 20) + "…" : x.v;
+          if (MODULES.has(x.v)) add(x.line, "err", `「${x.v}」を使うには、一番上に import ${x.v} を書きます`);
+          else if (KC_EXPORTS.has(x.v)) add(x.line, "err", `「${x.v}」を使うには、一番上の from keychain import に ${x.v} を足します`);
+          else {
+            const n = nearest(x.v, [...known, ...(sc ? [...sc.params, ...sc.assigned] : [])].filter((w) => !BUILTINS.has(w) || w.length > 3));
+            add(x.line, "err", `「${nm}」が作られていません${n ? `。「${n}」のまちがい？` : "（つづりのまちがいか、= で先に作るのを忘れていない？）"}`);
+          }
+        }
+        // ring.fil → ring.fill のこと？ ／ 引数の数
+        const obj = alias[x.v];
+        if (obj && API[obj] && t[k + 1] && t[k + 1].v === "." && t[k + 2] && t[k + 2].t === "name") {
+          const attr = t[k + 2].v, spec = API[obj][attr];
+          if (spec === undefined) {
+            const n = nearest(attr, Object.keys(API[obj]));
+            add(x.line, "err", `${x.v} に「${attr}」はありません${n ? `。「${x.v}.${n}」のこと？` : `（使えるのは ${Object.keys(API[obj]).filter((a) => API[obj][a]).join(", ")}）`}`);
+          } else if (spec) {
+            if (!t[k + 3] || t[k + 3].v !== "(") add(x.line, "warn", `${x.v}.${attr} のあとに ( ) がありません。これでは動きません（${x.v}.${attr}() と書きます）`);
+            else {
+              const args = argList(t, k + 3);
+              if (args.length < spec[0] || args.length > spec[1]) {
+                if (obj === "ring" && ((attr === "fill" && args.length === 3) || (attr === "set" && args.length === 4))) {
+                  const txt = (a) => a.map((y) => y.v).join("").replace(/,/g, ", ");
+                  const rgb = args.slice(-3).map(txt).join(", "), head = attr === "set" ? txt(args[0]) + ", " : "";
+                  add(x.line, "err", `色は (赤, 緑, 青) のように、かっこでまとめて1つにします（${x.v}.${attr}(${head}(${rgb})) と書きます）`);
+                }
+                else add(x.line, "err", `${x.v}.${attr}() に渡すものの数がちがいます（${args.length}個 → ${spec[0] === spec[1] ? spec[0] : spec[0] + "〜" + spec[1]}個）`);
+              } else litChecks(obj, attr, args, x.line);
+            }
+          }
+        }
+        if (obj && API[obj] && t[k + 1] && t[k + 1].v === "[") add(x.line, "err", `${x.v}[番号] は使えません。${obj === "ring" ? "ring.set(番号, 色)" : obj + ".set(番号)"} を使います`);
+      }
+    }
+    function argList(t, open) {             // ( の次から ) までを , で分ける
+      const args = []; let cur = [], d = t[open].depth;
+      for (let k = open + 1; k < t.length; k++) {
+        const x = t[k];
+        if (x.v === ")" && x.depth === d) break;
+        if (x.v === "," && x.depth === d + 1) { args.push(cur); cur = []; continue; }
+        cur.push(x);
+      }
+      if (cur.length) args.push(cur);
+      return args;
+    }
+    function litChecks(obj, attr, args, line) {
+      const num = (a) => (a.length === 1 && a[0].t === "num" ? Number(a[0].v) : a.length === 2 && a[0].v === "-" && a[1].t === "num" ? -Number(a[1].v) : null);
+      if (obj === "bar" && attr === "set") { const n = num(args[0]); if (n !== null && (n < 0 || n > 9)) add(line, "warn", `バーの番号は 0〜9 です（${n} は光りません）`); }
+      if (obj === "bar" && attr === "level") { const n = num(args[0]); if (n !== null && (n < 0 || n > 10)) add(line, "warn", `bar.level() は 0〜10 です（${n}）`); }
+      if (obj === "ring") {
+        const c = args[attr === "set" ? 1 : 0];
+        if (c && c[0] && c[0].v === "(") {
+          const inner = argList(c, 0);
+          if (c[c.length - 1].v === ")" && inner.length !== 3) add(line, "err", `色は (赤, 緑, 青) の3つの数で書きます（いまは ${inner.length} 個）`);
+          inner.forEach((a) => { const n = num(a); if (n !== null && (n < 0 || n > 255)) add(line, "warn", `色の数は 0〜255 です（${n}）`); });
+        }
+        if (attr === "set") { const n = num(args[0]); if (n !== null && (n < 0 || n > 11)) add(line, "warn", `リングの番号は 0〜11 です（${n} は ${((n % 12) + 12) % 12} 番が光ります）`); }
+      }
+    }
+
+    // ---- global の書きわすれ
+    for (const s of scopes) {
+      for (const [n, line] of s.aug) if (globalsDef.has(n) && !s.globals.has(n) && !s.params.has(n))
+        add(line, "err", `${s.name}() の中で「${n}」を変えるには、${s.name}() の最初に global ${n} を書きます`);
+      for (const [n, line] of s.plain) {
+        if (!globalsDef.has(n) || s.globals.has(n) || s.params.has(n) || s.aug.has(n) || scopes.some((o) => o.name === n)) continue;
+        // 「n = n + 1」のように右がわでも使うと、基板でエラーになる（UnboundLocalError）
+        const L = s.lines.find((x) => x.line === line), eq = L ? L.toks.findIndex((x) => x.v === "=" && x.depth === 0) : -1;
+        if (eq >= 0 && L.toks.slice(eq + 1).some((x, k, a) => x.t === "name" && x.v === n && (k === 0 || a[k - 1].v !== ".")))
+          add(line, "err", `${s.name}() の中で「${n}」を変えるには、${s.name}() の最初に global ${n} を書きます`);
+        else add(line, "warn", `${s.name}() の中の「${n} = …」は外の ${n} を変えません。変えたいときは ${s.name}() の最初に global ${n} を書きます`);
+      }
+    }
+
+    // ---- 基板で動かすときの決まり
+    const loopFn = scopes.find((s) => s.name === "loop"), setupFn = scopes.find((s) => s.name === "setup");
+    const topWhile = lines.find((L) => L.indent === 0 && L.toks[0].v === "while" && ["True", "1"].includes(L.toks[1] && L.toks[1].v));
+    if (topWhile) add(topWhile.line, "err", "一番外の while True は基板の中で終わらず、A ボタンで次のアプリへ進めなくなります。中身を def loop(): に入れてください（「ブロックにする」で自動で直せます）");
+    else if (!loopFn) add(1, "warn", "def loop(): がありません。ずっとくりかえす部分がないので、1回動いて止まります");
+    for (const s of [loopFn, setupFn]) {
+      if (!s) continue;
+      if (s.params.size) add(s.line, "err", `def ${s.name}(): のかっこの中は空にします（基板は何も渡しません）`);
+      const w = s.lines.find((L) => L.toks[0].v === "while" && ["True", "1"].includes(L.toks[1] && L.toks[1].v));
+      if (w && !s.lines.some((L) => L.toks[0].v === "break" || L.toks[0].v === "return"))
+        add(w.line, "warn", `${s.name}() の中の while True は終わらないので、A ボタンで次のアプリに進めなくなります。loop() は基板がくりかえし呼ぶので while は要りません`);
+    }
+    const all = lines.flatMap((L) => L.toks);
+    const uses = (o, a) => all.some((x, k) => alias[x.v] === o && all[k + 1] && all[k + 1].v === "." && all[k + 2] && all[k + 2].v === a);
+    if ((uses("ring", "set") || uses("ring", "fill")) && !uses("ring", "show"))
+      add(1, "warn", "ring.show() がないので、リングが光りません（色を決めたあとに ring.show() を書きます）");
+
+    // 書き方のまちがい（全角・かっこ・字下げ）がある行は、ほかの注意を出さない（同じ原因のことが多い）
+    const synLines = new Set(out.filter((p) => p.syntax).map((p) => p.line));
+    const rank = (p) => (p.level === "err" ? 0 : 1);
+    const seen = new Set();
+    return out
+      .map((p, k) => ({ p, k }))
+      .sort((a, b) => a.p.line - b.p.line || rank(a.p) - rank(b.p) || a.k - b.k)
+      .map((x) => x.p)
+      .filter((p) => !(synLines.has(p.line) && !p.syntax && p.level === "warn"))
+      .filter((p) => { const k = p.line + p.msg; if (seen.has(k)) return false; seen.add(k); return true; });
+  }
+  return { check };
+})();
+// ==== PyCheck end
 
 // ================================================================ Python → ブロック
 // AI（Gemma3 など）や自分で書いた Python を、このページのブロックに組み立て直す。
@@ -823,9 +1289,12 @@ const PyToBlocks = (() => {
   const lastLine = (n) => (n.children.length ? lastLine(n.children[n.children.length - 1]) : n.to);
 
   // ---- 変換の本体
-  function convert(input) {
+  function extract(input) {                // AIの答えなら ```python の中だけ
     const fence = /```[ \t]*(?:python|py|micropython)?[ \t]*\n([\s\S]*?)```/i.exec(input);
-    const src = fence ? fence[1] : input;
+    return fence ? fence[1] : input;
+  }
+  function convert(input) {
+    const src = extract(input);
     const legend = {};
     for (const m of src.matchAll(/^#\s*(var\d+)\s*=\s*「(.+?)」\s*$/gm)) legend[m[1]] = m[2];
     const generated = /^#\s*ブロックから作ったプログラム/m.test(src);
@@ -1109,7 +1578,7 @@ const PyToBlocks = (() => {
     return { state: { blocks: { languageVersion: 0, blocks }, variables }, made, raws };
   }
 
-  return { convert };
+  return { convert, extract };
 })();
 
 let undoState = null;
@@ -1117,6 +1586,8 @@ function importPython(text, msgEl) {
   const say = (t, cls) => { msgEl.textContent = t; msgEl.className = "status " + (cls || ""); };
   if (!ws) { say("ブロックの部品が読み込めていないので、変換できません。", "err"); return false; }
   if (!text.trim()) { say("Python が空です。", "err"); return false; }
+  const bad = PyCheck.check(PyToBlocks.extract(text)).filter((p) => p.syntax);
+  if (bad.length) { say(`書き方のまちがいがあるので、ブロックにできません（${bad[0].line}行目：${bad[0].msg}）。先に直してください。`, "err"); return false; }
   let r;
   try { r = PyToBlocks.convert(text); } catch (e) { say("ブロックにできませんでした。setup() と loop() のある形か確かめてください。", "err"); return false; }
   const before = Blockly.serialization.workspaces.save(ws);
@@ -1130,6 +1601,7 @@ function importPython(text, msgEl) {
     return false;
   }
   Blockly.Events.enable();
+  ws.clearUndo();
   ws.cleanUp();
   undoState = before;
   $("imp-undo").hidden = false;
@@ -1156,7 +1628,7 @@ function renderChips() {
       box.appendChild(b);
     }
   };
-  make($("tsamples"), Object.keys(SAMPLES), tSample, (n) => { tSample = n; $("src").value = SAMPLES[n]; store.set("kc_src", SAMPLES[n]); renderChips(); updateSize(); });
+  make($("tsamples"), Object.keys(SAMPLES), tSample, (n) => { tSample = n; setText(SAMPLES[n], "見本を入れました。"); renderChips(); });
   if (ws) make($("bsamples"), Object.keys(BSAMPLES), bSample, loadBlockSample);
 }
 
@@ -1177,13 +1649,13 @@ function setMode(m) {
   $("pane-block").hidden = m !== "block";
   $("pane-text").hidden = m !== "text";
   if (m === "block" && ws) Blockly.svgResize(ws);
-  updateSize();
+  updateSize(); scheduleCheck(0);
 }
 $("tab-block").onclick = () => setMode("block");
 $("tab-text").onclick = () => setMode("text");
 $("to-text").onclick = () => {
   if (!generated) return;
-  $("src").value = generated; store.set("kc_src", generated); tSample = null; renderChips(); setMode("text");
+  tSample = null; setText(generated, "ブロックのプログラムをテキストに写しました。"); renderChips(); setMode("text");
 };
 
 $("imp-prompt").textContent = AI_PROMPT;
@@ -1201,6 +1673,7 @@ $("imp-undo").onclick = () => {
   if (!undoState || !ws) return;
   Blockly.Events.disable();
   try { Blockly.serialization.workspaces.load(undoState, ws); } finally { Blockly.Events.enable(); }
+  ws.clearUndo();
   undoState = null; $("imp-undo").hidden = true;
   showTopLeft();
   store.set("kc_ws", JSON.stringify(Blockly.serialization.workspaces.save(ws)));
@@ -1223,8 +1696,190 @@ if (savedSrc && savedSrc !== SAMPLES[tSample]) tSample = null;
 $("src").addEventListener("input", () => {
   store.set("kc_src", $("src").value);
   if (tSample && $("src").value !== SAMPLES[tSample]) { tSample = null; renderChips(); }
-  updateSize();
+  updateSize(); renderGutter(); scheduleCheck(400);
 });
+
+// ================================================================ テキスト欄の道具
+const TEMPLATE = `from keychain import ring, bar, sensor
+import time
+
+
+def setup():
+    pass
+
+
+def loop():
+    ring.show()
+    time.sleep_ms(20)
+`;
+let textUndo = null;
+// テキストを丸ごと入れかえる（見本・ブロックから写す・ぜんぶ消す）。前のテキストは「もどす」用に1つ覚えておく
+function setText(v, why) {
+  const ta = $("src");
+  if (ta.value.trim() && ta.value !== v) {
+    textUndo = ta.value;
+    $("t-undo").hidden = false;
+  }
+  ta.value = v; store.set("kc_src", v);
+  ta.scrollTop = 0;
+  updateSize(); renderGutter(); scheduleCheck(0);
+  $("t2b-msg").textContent = textUndo !== null && why ? why + "「前のテキストにもどす」で、前のに戻せます。" : "";
+  $("t2b-msg").className = "status";
+}
+$("t-clear").onclick = () => { tSample = null; renderChips(); setText(TEMPLATE, "ひな形だけにしました。"); };
+$("t-undo").onclick = () => {
+  if (textUndo === null) return;
+  const back = textUndo, now = $("src").value;
+  textUndo = now; setText(back); textUndo = now;        // もう一度押すと、また入れかわる
+  $("t2b-msg").textContent = "前のテキストにもどしました（もう一度押すと、もどす前に戻ります）。"; $("t2b-msg").className = "status";
+};
+
+// 行番号（チェックで見つかった行は色が変わる）
+let gutKey = "";
+function renderGutter() {
+  const n = $("src").value.split("\n").length, key = n + "|" + marksKey;
+  if (key === gutKey) return;
+  gutKey = key;
+  let h = "";
+  for (let i = 1; i <= n; i++) h += `<span${lineMarks[i] ? ` class="${lineMarks[i]}"` : ""}>${i}</span>`;
+  $("gut").innerHTML = h;
+  $("gut").scrollTop = $("src").scrollTop;
+}
+$("src").addEventListener("scroll", () => { $("gut").scrollTop = $("src").scrollTop; });
+
+// キーボード：Tab で字下げ、Shift+Tab でもどす、Enter で字下げを引きつぐ、Ctrl+/ でコメント
+let tabLeaves = false;                       // Esc を押したあとの Tab は、ふつうに次の場所へ移動
+function replaceRange(ta, start, end, text, selA, selB) {
+  ta.focus();
+  ta.setSelectionRange(start, end);
+  let ok = false;
+  try { ok = document.execCommand("insertText", false, text); } catch (e) { ok = false; }   // Ctrl+Z で戻せるように
+  if (!ok || ta.value.slice(start, start + text.length) !== text) {
+    ta.setRangeText(text, start, end, "end");
+    ta.dispatchEvent(new Event("input"));
+  }
+  if (selA !== undefined) ta.setSelectionRange(selA, selB);
+}
+function lineSpan(v, a, b) {                 // 選んでいる行の、最初の行の頭〜最後の行の終わり
+  const s = v.lastIndexOf("\n", a - 1) + 1;
+  let e = v.indexOf("\n", b > a && v[b - 1] === "\n" ? b - 1 : b);
+  if (e < 0) e = v.length;
+  return [s, e];
+}
+$("src").addEventListener("keydown", (e) => {
+  const ta = e.target, v = ta.value, a = ta.selectionStart, b = ta.selectionEnd;
+  if (e.key === "Escape") { tabLeaves = true; return; }
+  if (e.key === "Tab" && !tabLeaves && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault();
+    const multi = v.slice(a, b).includes("\n");
+    if (!e.shiftKey && !multi) {
+      const col = a - (v.lastIndexOf("\n", a - 1) + 1);
+      replaceRange(ta, a, b, " ".repeat(4 - (col % 4)));
+      return;
+    }
+    const [s, end] = lineSpan(v, a, b);
+    const rows = v.slice(s, end).split("\n");
+    const out = rows.map((r) => (e.shiftKey ? r.replace(/^ {1,4}/, "") : r.trim() ? "    " + r : r));
+    const text = out.join("\n");
+    const d0 = out[0].length - rows[0].length;
+    replaceRange(ta, s, end, text, multi ? s : Math.max(s, a + d0), multi ? s + text.length : Math.max(s, b + d0));
+    return;
+  }
+  tabLeaves = false;
+  if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.isComposing && e.keyCode !== 229) {
+    const s = v.lastIndexOf("\n", a - 1) + 1, line = v.slice(s, a);
+    let ind = /^ */.exec(line)[0].length;
+    const code = line.replace(/#.*$/, "").trimEnd();
+    if (code.endsWith(":")) ind += 4;
+    else if (/^\s*(return|pass|break|continue)\b/.test(line)) ind = Math.max(0, ind - 4);
+    e.preventDefault();
+    replaceRange(ta, a, b, "\n" + " ".repeat(ind));
+    return;
+  }
+  if (e.key === "/" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    const [s, end] = lineSpan(v, a, b);
+    const rows = v.slice(s, end).split("\n");
+    const on = rows.filter((r) => r.trim()).every((r) => /^\s*#/.test(r));
+    const out = rows.map((r) => (!r.trim() ? r : on ? r.replace(/^(\s*)# ?/, "$1") : r.replace(/^(\s*)/, "$1# ")));
+    const text = out.join("\n");
+    replaceRange(ta, s, end, text, s, s + text.length);
+  }
+});
+
+// ================================================================ ブロックの道具
+$("b-undo").onclick = () => ws && ws.undo(false);
+$("b-redo").onclick = () => ws && ws.undo(true);
+$("b-zin").onclick = () => ws && ws.zoomCenter(1);
+$("b-zout").onclick = () => ws && ws.zoomCenter(-1);
+$("b-fit").onclick = () => ws && ws.zoomToFit();
+$("b-tidy").onclick = () => { if (ws) { ws.cleanUp(); showTopLeft(); } };
+$("b-clear").onclick = () => {
+  if (!ws) return;
+  // 1つの操作として消すので、「もどす」1回で全部もどる
+  Blockly.Events.setGroup(true);
+  try {
+    for (const b of ws.getTopBlocks(false)) {
+      if (b.type === "kc_setup" || b.type === "kc_loop") { const c = b.getInputTargetBlock("DO"); if (c) c.dispose(false); }
+      else b.dispose(false);
+    }
+    if (!ws.getTopBlocks(false).some((b) => b.type === "kc_setup")) {
+      const s = ws.newBlock("kc_setup"); s.initSvg(); s.render(); s.moveBy(16, 16);
+    }
+  } finally { Blockly.Events.setGroup(false); }
+  showTopLeft();                             // 並べ直し（cleanUp）は別の操作になるので、ここではしない
+  $("imp-msg").textContent = "";
+  setStatus("ブロックを消しました。「もどす」で元にもどせます。", "");
+};
+function updateUndoButtons() {
+  if (!ws) return;
+  $("b-undo").disabled = !ws.getUndoStack().length;
+  $("b-redo").disabled = !ws.getRedoStack().length;
+}
+
+// ================================================================ コードチェックの表示
+let checkTimer = 0, lineMarks = {}, marksKey = "", lastIssues = [];
+function scheduleCheck(ms) { clearTimeout(checkTimer); checkTimer = setTimeout(runCheck, ms); }
+function runCheck() {
+  const src = currentSource();
+  let issues;
+  try { issues = PyCheck.check(src); } catch (e) { issues = []; }
+  lastIssues = issues;
+  const nErr = issues.filter((p) => p.level === "err").length, nWarn = issues.length - nErr;
+  const badge = $("chk-badge");
+  badge.className = "badge " + (nErr ? "err" : nWarn ? "warn" : "ok");
+  badge.textContent = nErr ? `まちがい ${nErr}` + (nWarn ? `・注意 ${nWarn}` : "") : nWarn ? `注意 ${nWarn}` : "OK";
+  $("chk-note").textContent = !src.trim() ? "" : nErr || nWarn
+    ? (mode === "text" ? "押すと、その行にとびます" : "行は「できたプログラム（Python）」の行です")
+    : "書き方のまちがいは見つかりませんでした";
+  const list = $("chk-list");
+  list.innerHTML = "";
+  const MAX = 8;
+  issues.slice(0, MAX).forEach((p) => {
+    const li = document.createElement("li"), btn = document.createElement("button");
+    btn.type = "button"; btn.className = "chk-item " + p.level;
+    const b = document.createElement("b"); b.textContent = `${p.line}行目`;
+    btn.append(b, (p.level === "err" ? "" : "注意：") + p.msg);
+    btn.onclick = () => jumpTo(p.line);
+    li.appendChild(btn); list.appendChild(li);
+  });
+  if (issues.length > MAX) { const li = document.createElement("li"); li.className = "note"; li.textContent = `ほかに ${issues.length - MAX} 件あります。上から直していくと、減っていきます。`; list.appendChild(li); }
+  lineMarks = {};
+  if (mode === "text") for (const p of issues) if (lineMarks[p.line] !== "e") lineMarks[p.line] = p.level === "err" ? "e" : "w";
+  marksKey = JSON.stringify(lineMarks);
+  renderGutter();
+}
+function jumpTo(line) {
+  if (mode !== "text") { const d = $("gen").closest("details"); d.open = true; d.scrollIntoView({ block: "nearest" }); return; }
+  const ta = $("src"), rows = ta.value.split("\n");
+  let s = 0; for (let i = 0; i < line - 1 && i < rows.length; i++) s += rows[i].length + 1;
+  const e = s + (rows[line - 1] || "").length;
+  ta.focus({ preventScroll: true });
+  ta.setSelectionRange(s, e);
+  const lh = parseFloat(getComputedStyle(ta).lineHeight) || 20;
+  ta.scrollTop = Math.max(0, (line - 4) * lh);
+  ta.scrollIntoView({ block: "nearest" });
+}
 
 // ブロック画面は見えている状態で作る（隠れたまま作ると大きさが0になる）
 $("pane-block").hidden = false;
@@ -1232,8 +1887,18 @@ initBlockly();
 renderChips();
 setMode(mode);
 
+let forceSrc = null;                          // まちがいがあっても保存する、と2回目を押したときのプログラム
 $("save").addEventListener("click", async () => {
-  const src = enc.encode(currentSource().replace(/\r\n/g, "\n"));
+  const text = currentSource();
+  const nErr = PyCheck.check(text).filter((p) => p.level === "err").length;
+  if (nErr && forceSrc !== text) {
+    forceSrc = text;
+    setStatus(`コードチェックで まちがいが ${nErr} 個 見つかりました（上の一覧）。このまま書き込むと、マイアプリで赤が3回点滅します。直さずに保存するときは、もう一度押してください。`, "err");
+    $("check").scrollIntoView({ block: "nearest", behavior: "smooth" });
+    return;
+  }
+  forceSrc = null;
+  const src = enc.encode(text.replace(/\r\n/g, "\n"));
   const uf2 = toUf2(programBlob(src), USER_ADDR);
   const dl = window.claude?.use ? await window.claude.use("downloads") : null;
   if (!dl) {                                 // claude.ai 以外（自社サイトなど）に置いたとき：ふつうのダウンロード
